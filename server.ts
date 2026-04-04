@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 
 // Rotas do nosso novo Backend Resolvido
-import transactionRoutes from "./src/backend/routes/transactionRoutes";
+import transactionRoutes from "./src/backend/routes/transactionRoutes.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
