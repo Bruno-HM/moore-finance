@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "householdId": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Household": {
+      "title": "Household",
+      "description": "A shared financial space for up to two users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "members", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "An income or expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "householdId": { "type": "string" },
+        "amount": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "createdBy": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "isRecurring": { "type": "boolean" },
+        "recurringId": { "type": "string" }
+      },
+      "required": ["id", "householdId", "amount", "categoryId", "date", "description", "type", "createdBy", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A category for transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "householdId": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense", "both"] },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["id", "householdId", "name", "color", "type", "isDefault"]
+    },
+    "RecurringTransaction": {
+      "title": "RecurringTransaction",
+      "description": "A template for recurring transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "householdId": { "type": "string" },
+        "amount": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "frequency": { "type": "string", "enum": ["monthly", "weekly", "yearly"] },
+        "nextDate": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "householdId", "amount", "categoryId", "description", "type", "frequency", "nextDate", "createdBy"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "households/{householdId}": {
+      "schema": { "$ref": "#/entities/Household" },
+      "description": "Shared households"
+    },
+    "transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Financial transactions"
+    },
+    "categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Transaction categories"
+    },
+    "recurring_transactions/{recurringId}": {
+      "schema": { "$ref": "#/entities/RecurringTransaction" },
+      "description": "Recurring transaction templates"
+    }
+  }
+}
