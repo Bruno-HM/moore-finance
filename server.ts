@@ -28,7 +28,24 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    // RESOLVIDO: O erro de MIME type ocorre quando o Express não acha o arquivo no dist.
+    // Usar path.resolve(__dirname, "dist") é mais seguro no Linux do Render.
+    const distPath = path.resolve(__dirname, "dist");
+    
+    // Log de diagnóstico na inicialização
+    import("node:fs").then((fs) => {
+      if (fs.existsSync(distPath)) {
+        console.log(`✅ Servindo arquivos estáticos de: ${distPath}`);
+        if (fs.existsSync(path.join(distPath, "index.html"))) {
+          console.log("✅ index.html encontrado na pasta dist.");
+        } else {
+          console.error("❌ ERRO: index.html NÃO ENCONTRADO na pasta dist!");
+        }
+      } else {
+        console.error(`❌ ERRO: Pasta dist NÃO ENCONTRADA em: ${distPath}`);
+      }
+    });
+
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
