@@ -93,20 +93,11 @@ const DEFAULT_CATEGORIES = [
   { name: 'Salário', color: '#10B981', type: 'receita' },
 ];
 
-function cleanUndefined(obj: any) {
-  const newObj: any = {};
-  Object.keys(obj).forEach((key) => {
-    if (obj[key] !== undefined) {
-      newObj[key] = obj[key];
-    }
-  });
-  return newObj;
-}
+
 
 export function calculateBillingDate(dateStr: string, paymentMethod: string, creditCard?: CreditCard): string {
   const date = parseISO(dateStr);
   
-  // Se não tem cartão ou não é método 'credito', a data efetiva é a própria data de emissão.
   if (paymentMethod !== 'credito' || !creditCard) {
     return dateStr;
   }
@@ -116,20 +107,20 @@ export function calculateBillingDate(dateStr: string, paymentMethod: string, cre
   const year = date.getFullYear();
   const month = date.getMonth(); // 0-based
 
-  // Regra A: Se a 'Data da Compra' for ANTES do 'dia de fechamento' -> fatura do mês atual.
-  // Regra B: Se a 'Data da Compra' for IGUAL ou DEPOIS -> fatura fechou, vai para o mês seguinte.
-  let billingMonth = month;
+  // Nova Lógica de Faturamento Baseada em Exemplos A, B e C:
+  // O mês de referência (que aparece no Dashboard) é o mês da fatura.
+  // 1. Se o vencimento cai no mês seguinte ao fechamento (dueDay < closingDay), iniciamos com offset +1.
+  // 2. Se a compra for feita no dia do fechamento ou DEPOIS (day >= closingDay), pulamos mais um mês (+1).
+  const billingMonthOffset = (transactionDay >= closingDay ? 1 : 0) + (dueDay < closingDay ? 1 : 0);
+  
+  let billingMonth = month + billingMonthOffset;
   let billingYear = year;
 
-  if (transactionDay >= closingDay) {
-    billingMonth += 1;
-    if (billingMonth > 11) {
-      billingMonth = 0;
-      billingYear += 1;
-    }
+  while (billingMonth > 11) {
+    billingMonth -= 12;
+    billingYear += 1;
   }
 
-  // Regra C: O vencimento considera o 'dueDay' daquela fatura
   // Ajuste do limit do mês (ex: dia 31 em mês q só tem 30)
   const lastDayOfTargetMonth = new Date(billingYear, billingMonth + 1, 0).getDate();
   const safeDueDay = Math.min(dueDay, lastDayOfTargetMonth);
@@ -353,14 +344,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const id = uuidv4();
         const cc = creditCards.find(c => c.id === transaction.creditCardId);
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
-        await setDoc(doc(db, 'transactions', id), cleanUndefined({
+        await setDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
           createdBy: uid,
           recurringId,
           billingDate,
-        }));
+        });
       } else if (transaction.recurrenceType === 'parcelada' && transaction.totalInstallments) {
         const recurringId = uuidv4();
         const baseDate = new Date(transaction.date);
@@ -372,7 +363,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === transaction.creditCardId);
           const billingDate = calculateBillingDate(installmentDate.toISOString(), transaction.paymentMethod, cc);
           
-          await setDoc(doc(db, 'transactions', id), cleanUndefined({
+          await setDoc(doc(db, 'transactions', id), {
             ...transaction,
             id,
             householdId,
@@ -382,19 +373,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             installmentNumber: i + 1,
             recurringId,
             status: i === 0 ? transaction.status : 'pendente',
-          }));
+          });
         }
       } else {
         const id = uuidv4();
         const cc = creditCards.find(c => c.id === transaction.creditCardId);
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
-        await setDoc(doc(db, 'transactions', id), cleanUndefined({
+        await setDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
           createdBy: uid,
           billingDate,
-        }));
+        });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'transactions');
@@ -433,10 +424,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === newCreditCardId);
           const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-          await setDoc(doc(db, 'transactions', t.id), cleanUndefined({
+          await setDoc(doc(db, 'transactions', t.id), {
             ...transaction,
             billingDate
-          }), { merge: true });
+          }, { merge: true });
         }
       } else {
         const newDate = transaction.date ?? original.date;
@@ -445,10 +436,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const cc = creditCards.find(c => c.id === newCreditCardId);
         const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-        await setDoc(doc(db, 'transactions', id), cleanUndefined({
+        await setDoc(doc(db, 'transactions', id), {
           ...transaction,
           billingDate
-        }), { merge: true });
+        }, { merge: true });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `transactions/${id}`);
@@ -504,7 +495,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (!rt) return;
 
       if (mode === 'futuras') {
-        await setDoc(doc(db, 'recurring_transactions', id), cleanUndefined(transaction), { merge: true });
+        await setDoc(doc(db, 'recurring_transactions', id), transaction, { merge: true });
       }
       
       const closingDay = userProfile.creditCardClosingDay;
@@ -544,14 +535,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         
         const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-        await setDoc(doc(db, 'transactions', t.id), cleanUndefined({
+        await setDoc(doc(db, 'transactions', t.id), {
           amount: transaction.amount,
           categoryId: transaction.categoryId,
           description: transaction.description,
           paymentMethod: transaction.paymentMethod,
           date: newDate,
           billingDate: billingDate
-        }), { merge: true });
+        }, { merge: true });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `recurring_transactions/${id}`);
@@ -695,12 +686,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!userProfile?.householdId) return;
     const id = uuidv4();
     try {
-      await setDoc(doc(db, 'categories', id), cleanUndefined({
+      await setDoc(doc(db, 'categories', id), {
         ...category,
         id,
         householdId: userProfile.householdId,
         isDefault: false,
-      }));
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `categories/${id}`);
     }
@@ -709,7 +700,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateCategory = async (id: string, category: Partial<Category>) => {
     if (!userProfile?.householdId) return;
     try {
-      await setDoc(doc(db, 'categories', id), cleanUndefined(category), { merge: true });
+      await setDoc(doc(db, 'categories', id), category, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `categories/${id}`);
     }
@@ -735,11 +726,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!userProfile?.householdId) return;
     const id = uuidv4();
     try {
-      await setDoc(doc(db, 'credit_cards', id), cleanUndefined({
+      await setDoc(doc(db, 'credit_cards', id), {
         ...card,
         id,
         householdId: userProfile.householdId,
-      }));
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `credit_cards/${id}`);
     }
@@ -748,7 +739,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateCreditCard = async (id: string, card: Partial<CreditCard>) => {
     if (!userProfile?.householdId) return;
     try {
-      await setDoc(doc(db, 'credit_cards', id), cleanUndefined(card), { merge: true });
+      await setDoc(doc(db, 'credit_cards', id), { ...card }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `credit_cards/${id}`);
     }

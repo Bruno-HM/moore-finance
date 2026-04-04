@@ -4,6 +4,8 @@ import { getAuth } from 'firebase-admin/auth';
 import fs from 'node:fs';
 import path from 'node:path';
 
+let isInitialized = false;
+
 try {
   let serviceAccount: any;
   
@@ -20,13 +22,16 @@ try {
     initializeApp({
       credential: cert(serviceAccount)
     });
-    console.log("Firebase Admin SDK initialized successfully.");
+    console.log("✅ Firebase Admin SDK initialized successfully.");
+    isInitialized = true;
   } else {
-    console.warn("Firebase Admin SDK: No service account found. Check process.env.FIREBASE_SERVICE_ACCOUNT or 'serviceAccountKey.json' file.");
+    console.error("❌ Firebase Admin SDK: No service account found!");
+    console.error("Please add the FIREBASE_SERVICE_ACCOUNT environment variable in your hosting dashboard.");
   }
 } catch (error) {
-  console.error("Firebase Admin SDK initialization failed:", error);
+  console.error("❌ Firebase Admin SDK initialization failed:", error);
 }
 
-export const adminDb = getFirestore();
-export const adminAuth = getAuth();
+export const adminDb = isInitialized ? getFirestore() : null as any;
+export const adminAuth = isInitialized ? getAuth() : null as any;
+

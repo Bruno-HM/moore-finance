@@ -11,7 +11,7 @@ import { format, parseISO, isSameMonth, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Search, Trash2, Edit2, CheckCircle2, Circle, Download, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import AITransactionInput from '../components/AITransactionInput';
+
 import Papa from 'papaparse';
 import { MonthSelector } from '../components/MonthSelector';
 import { Switch } from '../components/ui/switch';
@@ -254,32 +254,7 @@ export default function Transactions() {
     setTotalAmount('');
   };
 
-  const handleAIResult = (data: any) => {
-    if (data.description) setDescription(data.description);
-    if (data.amount) setAmount(data.amount.toString());
-    if (data.type) setType(data.type);
-    if (data.paymentMethod) setPaymentMethod(data.paymentMethod);
-    if (data.recurrenceType) setRecurrenceType(data.recurrenceType);
-    if (data.totalInstallments) setTotalInstallments(data.totalInstallments.toString());
-    if (data.billingDay) setBillingDay(data.billingDay.toString());
-    if (data.date) setDate(data.date.split('T')[0]);
-    if (data.creditCardId) setCreditCardId(data.creditCardId);
-    
-    // Auto-calculate total if AI provides installments
-    if (data.recurrenceType === 'parcelada') {
-      const amt = data.amount || parseFloat(amount);
-      const inst = data.totalInstallments || parseInt(totalInstallments);
-      if (!isNaN(amt) && !isNaN(inst)) {
-        setTotalAmount((amt * inst).toFixed(2));
-      }
-    }
-    if (data.categoryName) {
-      const cat = categories.find(c => c.name.toLowerCase() === data.categoryName.toLowerCase());
-      if (cat) setCategoryId(cat.id);
-    }
-    setIsDialogOpen(true);
-    toast.success('Dados preenchidos pela IA! Revise e confirme.');
-  };
+
 
   const toggleStatus = async (transaction: Transaction) => {
     if (transaction.type === 'receita') return;
@@ -627,12 +602,7 @@ export default function Transactions() {
       </div>
     </div>
 
-        <div className="mt-6">
-          <div className="space-y-2">
-            <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Entrada Rápida com IA</Label>
-            <AITransactionInput onResult={handleAIResult} />
-          </div>
-        </div>
+
 
         <Card className="mt-6">
         <CardHeader className="pb-3">
