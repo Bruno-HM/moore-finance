@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
+import { safeSetDoc } from '../lib/firestore-utils';
 import { v4 as uuidv4 } from 'uuid';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
               
               try {
-                await setDoc(doc(db, 'households', personalId), {
+                await safeSetDoc(doc(db, 'households', personalId), {
                   id: personalId,
                   inviteCode,
                   members: [firebaseUser.uid],
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   createdAt: new Date().toISOString(),
                 });
                 
-                await setDoc(userRef, { 
+                await safeSetDoc(userRef, { 
                   personalHouseholdId: personalId,
                   householdId: userData.householdId || personalId 
                 }, { merge: true });
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (!inviteCode) {
                       inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                       try {
-                        await setDoc(doc(db, 'households', currentHouseholdId!), { inviteCode }, { merge: true });
+                        await safeSetDoc(doc(db, 'households', currentHouseholdId!), { inviteCode }, { merge: true });
                       } catch (err) {
                         console.error('Error auto-repairing invite code:', err);
                       }
@@ -112,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   } else {
                     // Household deleted or inaccessible, fallback to personal
                     if (userData.personalHouseholdId && userData.householdId !== userData.personalHouseholdId) {
-                      await setDoc(userRef, { householdId: userData.personalHouseholdId }, { merge: true });
+                      await safeSetDoc(userRef, { householdId: userData.personalHouseholdId }, { merge: true });
                     }
                     setUserProfile(userData);
                   }
@@ -148,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             try {
               // Create household first
-              await setDoc(doc(db, 'households', personalId), {
+              await safeSetDoc(doc(db, 'households', personalId), {
                 id: personalId,
                 inviteCode,
                 members: [firebaseUser.uid],
@@ -157,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 createdAt: new Date().toISOString(),
               });
               // Then create profile
-              await setDoc(userRef, newProfile);
+              await safeSetDoc(userRef, newProfile);
             } catch (err) {
               console.error('Error initializing user:', err);
               handleFirestoreError(err, OperationType.WRITE, `users/${firebaseUser.uid}`, firebaseUser);
@@ -223,12 +224,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Você já é um membro desta conta.');
           }
           
-          await setDoc(doc(db, 'households', householdId), {
+          await safeSetDoc(doc(db, 'households', householdId), {
             members: [...data.members, user.uid]
           }, { merge: true });
           
           const userRef = doc(db, 'users', user.uid);
-          await setDoc(userRef, { householdId }, { merge: true });
+          await safeSetDoc(userRef, { householdId }, { merge: true });
         } else {
           throw new Error('Esta conta já atingiu o limite de 2 membros.');
         }
@@ -258,11 +259,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = hSnap.data();
         const newMembers = data.members.filter((m: string) => m !== user.uid);
         
-        await setDoc(householdRef, { members: newMembers }, { merge: true });
+        await safeSetDoc(householdRef, { members: newMembers }, { merge: true });
       }
       
       const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, { householdId: userProfile.personalHouseholdId }, { merge: true });
+      await safeSetDoc(userRef, { householdId: userProfile.personalHouseholdId }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `households/leave`);
     }
@@ -272,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
     try {
-      await setDoc(userRef, data, { merge: true });
+      await safeSetDoc(userRef, data, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
     }

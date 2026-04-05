@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy, getDocFromServer } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy, getDocFromServer } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+import { safeSetDoc } from '../lib/firestore-utils';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
@@ -146,6 +147,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [includePending, setIncludePending] = useState(true);
 
   useEffect(() => {
+    console.log("✅ FinanceContext: V2 - Sanitization Active");
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
@@ -219,7 +221,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         for (const cat of DEFAULT_CATEGORIES) {
           const id = uuidv4();
           try {
-            await setDoc(doc(db, 'categories', id), {
+            await safeSetDoc(doc(db, 'categories', id), {
               id,
               householdId,
               name: cat.name,
@@ -288,7 +290,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const billingDate = calculateBillingDate(transactionDate.toISOString(), rt.paymentMethod, cc);
 
           try {
-            await setDoc(doc(db, 'transactions', id), {
+            await safeSetDoc(doc(db, 'transactions', id), {
               id,
               householdId: userProfile.householdId,
               amount: rt.amount,
@@ -326,7 +328,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const startDate = new Date(transaction.date);
         const billingDay = transaction.billingDay || startDate.getDate();
 
-        await setDoc(doc(db, 'recurring_transactions', recurringId), {
+        await safeSetDoc(doc(db, 'recurring_transactions', recurringId), {
           id: recurringId,
           householdId,
           amount: transaction.amount,
@@ -344,7 +346,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const id = uuidv4();
         const cc = creditCards.find(c => c.id === transaction.creditCardId);
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
-        await setDoc(doc(db, 'transactions', id), {
+        await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
@@ -363,7 +365,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === transaction.creditCardId);
           const billingDate = calculateBillingDate(installmentDate.toISOString(), transaction.paymentMethod, cc);
           
-          await setDoc(doc(db, 'transactions', id), {
+          await safeSetDoc(doc(db, 'transactions', id), {
             ...transaction,
             id,
             householdId,
@@ -379,7 +381,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const id = uuidv4();
         const cc = creditCards.find(c => c.id === transaction.creditCardId);
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
-        await setDoc(doc(db, 'transactions', id), {
+        await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
@@ -402,7 +404,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (mode !== 'unica' && original.recurringId) {
         // Update template if it's fixed/subscription
         if (original.recurrenceType === 'fixa' || original.recurrenceType === 'assinatura') {
-          await setDoc(doc(db, 'recurring_transactions', original.recurringId), {
+          await safeSetDoc(doc(db, 'recurring_transactions', original.recurringId), {
             amount: transaction.amount ?? original.amount,
             categoryId: transaction.categoryId ?? original.categoryId,
             description: transaction.description ?? original.description,
@@ -424,7 +426,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === newCreditCardId);
           const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-          await setDoc(doc(db, 'transactions', t.id), {
+          await safeSetDoc(doc(db, 'transactions', t.id), {
             ...transaction,
             billingDate
           }, { merge: true });
@@ -436,7 +438,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const cc = creditCards.find(c => c.id === newCreditCardId);
         const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-        await setDoc(doc(db, 'transactions', id), {
+        await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
           billingDate
         }, { merge: true });
@@ -461,7 +463,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           if (rt && (rt.recurrenceType === 'fixa' || rt.recurrenceType === 'assinatura')) {
             const monthKey = format(new Date(transactionToDelete.date), 'yyyy-MM');
             const newSkipped = [...(rt.skippedDates || []), monthKey];
-            await setDoc(doc(db, 'recurring_transactions', rt.id), { skippedDates: newSkipped }, { merge: true });
+          await safeSetDoc(doc(db, 'recurring_transactions', rt.id), { skippedDates: newSkipped }, { merge: true });
           }
           await deleteDoc(doc(db, 'transactions', id));
         } else {
@@ -495,7 +497,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (!rt) return;
 
       if (mode === 'futuras') {
-        await setDoc(doc(db, 'recurring_transactions', id), transaction, { merge: true });
+        await safeSetDoc(doc(db, 'recurring_transactions', id), transaction, { merge: true });
       }
       
       const closingDay = userProfile.creditCardClosingDay;
@@ -535,7 +537,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         
         const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
-        await setDoc(doc(db, 'transactions', t.id), {
+        await safeSetDoc(doc(db, 'transactions', t.id), {
           amount: transaction.amount,
           categoryId: transaction.categoryId,
           description: transaction.description,
@@ -634,7 +636,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
                   instance.paymentMethod !== rt.paymentMethod ||
                   instance.date !== newDate ||
                   instance.billingDate !== billingDate) {
-                await setDoc(doc(db, 'transactions', instance.id), {
+                await safeSetDoc(doc(db, 'transactions', instance.id), {
                   amount: rt.amount,
                   description: rt.description,
                   categoryId: rt.categoryId,
@@ -658,7 +660,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             const cc = creditCards.find(c => c.id === ccId);
             const billingDate = calculateBillingDate(transactionDate.toISOString(), rt.paymentMethod, cc);
 
-            await setDoc(doc(db, 'transactions', id), {
+            await safeSetDoc(doc(db, 'transactions', id), {
               id,
               householdId: userProfile.householdId,
               amount: rt.amount,
@@ -686,7 +688,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!userProfile?.householdId) return;
     const id = uuidv4();
     try {
-      await setDoc(doc(db, 'categories', id), {
+      await safeSetDoc(doc(db, 'categories', id), {
         ...category,
         id,
         householdId: userProfile.householdId,
@@ -700,7 +702,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateCategory = async (id: string, category: Partial<Category>) => {
     if (!userProfile?.householdId) return;
     try {
-      await setDoc(doc(db, 'categories', id), category, { merge: true });
+      await safeSetDoc(doc(db, 'categories', id), category, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `categories/${id}`);
     }
@@ -726,7 +728,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!userProfile?.householdId) return;
     const id = uuidv4();
     try {
-      await setDoc(doc(db, 'credit_cards', id), {
+      await safeSetDoc(doc(db, 'credit_cards', id), {
         ...card,
         id,
         householdId: userProfile.householdId,
@@ -739,7 +741,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateCreditCard = async (id: string, card: Partial<CreditCard>) => {
     if (!userProfile?.householdId) return;
     try {
-      await setDoc(doc(db, 'credit_cards', id), { ...card }, { merge: true });
+      await safeSetDoc(doc(db, 'credit_cards', id), { ...card }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `credit_cards/${id}`);
     }

@@ -33,5 +33,8 @@ try {
 }
 
 export const adminDb = isInitialized ? getFirestore() : null as any;
+if (isInitialized && adminDb) {
+  adminDb.settings({ ignoreUndefinedProperties: true });
+}
 export const adminAuth = isInitialized ? getAuth() : null as any;
 
