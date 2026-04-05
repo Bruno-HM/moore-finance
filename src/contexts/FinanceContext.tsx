@@ -33,6 +33,7 @@ export interface CreditCard {
   name: string;
   closingDay: number;
   dueDay: number;
+  closingDayExceptions?: Record<string, number>; // Format: "YYYY-MM": day
 }
 
 export interface RecurringTransaction {
@@ -73,6 +74,7 @@ interface FinanceContextType {
   addCreditCard: (card: Omit<CreditCard, 'id' | 'householdId'>) => Promise<void>;
   updateCreditCard: (id: string, card: Partial<CreditCard>) => Promise<void>;
   deleteCreditCard: (id: string) => Promise<void>;
+  recalculateTransactionsForCard: (cardId: string, monthKey?: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'householdId' | 'createdBy'> & { billingDay?: number }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>, mode?: 'unica' | 'futuras' | 'todos') => Promise<void>;
   deleteTransaction: (id: string, mode?: 'unica' | 'futuras' | 'todos') => Promise<void>;
@@ -103,10 +105,13 @@ export function calculateBillingDate(dateStr: string, paymentMethod: string, cre
     return dateStr;
   }
 
-  const { closingDay, dueDay } = creditCard;
+  const { dueDay, closingDayExceptions } = creditCard;
   const transactionDay = date.getDate();
   const year = date.getFullYear();
   const month = date.getMonth(); // 0-based
+  
+  const monthKey = format(date, 'yyyy-MM');
+  const closingDay = closingDayExceptions?.[monthKey] ?? creditCard.closingDay;
 
   // Nova Lógica de Faturamento Baseada em Exemplos A, B e C:
   // O mês de referência (que aparece no Dashboard) é o mês da fatura.
@@ -742,8 +747,41 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!userProfile?.householdId) return;
     try {
       await safeSetDoc(doc(db, 'credit_cards', id), { ...card }, { merge: true });
+      
+      // If closingDay or exceptions changed, recalculate all transactions for this card
+      if (card.closingDay !== undefined || card.closingDayExceptions !== undefined) {
+        await recalculateTransactionsForCard(id);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `credit_cards/${id}`);
+    }
+  };
+
+  const recalculateTransactionsForCard = async (cardId: string, monthKey?: string) => {
+    if (!userProfile?.householdId) return;
+    
+    try {
+      const card = creditCards.find(c => c.id === cardId);
+      if (!card) return;
+
+      const targetTransactions = transactions.filter(t => {
+        if (t.creditCardId !== cardId) return false;
+        if (monthKey) {
+          return format(parseISO(t.date), 'yyyy-MM') === monthKey;
+        }
+        return true;
+      });
+
+      for (const t of targetTransactions) {
+        const newBillingDate = calculateBillingDate(t.date, t.paymentMethod, card);
+        if (newBillingDate !== t.billingDate) {
+          await safeSetDoc(doc(db, 'transactions', t.id), {
+            billingDate: newBillingDate
+          }, { merge: true });
+        }
+      }
+    } catch (error) {
+      console.error('Error recalculating card transactions:', error);
     }
   };
 
@@ -780,7 +818,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       deleteCategory,
       addCreditCard,
       updateCreditCard,
-      deleteCreditCard
+      deleteCreditCard,
+      recalculateTransactionsForCard
     }}>
       {children}
     </FinanceContext.Provider>

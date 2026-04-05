@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
@@ -21,11 +23,14 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { creditCards, addCreditCard, deleteCreditCard } = useFinance();
+  const { creditCards, addCreditCard, deleteCreditCard, updateCreditCard } = useFinance();
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardClosing, setNewCardClosing] = useState('');
   const [newCardDue, setNewCardDue] = useState('');
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [exceptionMonth, setExceptionMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [exceptionDay, setExceptionDay] = useState('');
 
   useEffect(() => {
     if (userProfile?.creditCardClosingDay) {
@@ -129,6 +134,48 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
     } catch (error) {
       console.error(error);
       toast.error('Erro ao remover cartão.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddException = async (cardId: string) => {
+    const card = creditCards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const day = parseInt(exceptionDay);
+    if (isNaN(day) || day < 1 || day > 31) {
+      toast.error('Dia inválido.');
+      return;
+    }
+
+    const newExceptions = { ...(card.closingDayExceptions || {}), [exceptionMonth]: day };
+    
+    setActionLoading(true);
+    try {
+      await updateCreditCard(cardId, { closingDayExceptions: newExceptions });
+      toast.success(`Exceção adicionada para ${exceptionMonth}`);
+      setExceptionDay('');
+    } catch (error) {
+      toast.error('Erro ao adicionar exceção.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveException = async (cardId: string, monthKey: string) => {
+    const card = creditCards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const newExceptions = { ...(card.closingDayExceptions || {}) };
+    delete newExceptions[monthKey];
+
+    setActionLoading(true);
+    try {
+      await updateCreditCard(cardId, { closingDayExceptions: newExceptions });
+      toast.success('Exceção removida.');
+    } catch (error) {
+      toast.error('Erro ao remover exceção.');
     } finally {
       setActionLoading(false);
     }
@@ -247,14 +294,80 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
               {creditCards.length > 0 ? (
                 <div className="space-y-2 mt-2">
                   {creditCards.map(cc => (
-                    <div key={cc.id} className="flex items-center justify-between p-2 rounded-md border bg-neutral-50 dark:bg-neutral-800">
-                      <div>
-                        <p className="text-sm font-medium">{cc.name}</p>
-                        <p className="text-[10px] text-muted-foreground">Fechamento: {cc.closingDay} | Vencimento: {cc.dueDay}</p>
+                    <div key={cc.id} className="space-y-2 border p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <CreditCardIcon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold">{cc.name}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                              Fechamento: {cc.closingDay} | Vencimento: {cc.dueDay}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={`h-8 w-8 ${editingCardId === cc.id ? 'text-primary bg-primary/10' : 'text-muted-foreground'}`}
+                            onClick={() => setEditingCardId(editingCardId === cc.id ? null : cc.id)}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCard(cc.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCard(cc.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+
+                      {editingCardId === cc.id && (
+                        <div className="mt-3 pt-3 border-t space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Exceções de Fechamento</Label>
+                            <div className="flex gap-2">
+                              <Input 
+                                type="month" 
+                                value={exceptionMonth} 
+                                onChange={e => setExceptionMonth(e.target.value)} 
+                                className="h-9 text-xs"
+                              />
+                              <Input 
+                                type="number" 
+                                placeholder="Dia" 
+                                value={exceptionDay} 
+                                onChange={e => setExceptionDay(e.target.value)} 
+                                className="h-9 w-20 text-xs"
+                              />
+                                <Button size="sm" className="h-9" onClick={() => handleAddException(cc.id)} disabled={actionLoading}>
+                                  <Plus className="w-4 h-4" />
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground italic">
+                              * Use isso se o dia de fechamento mudar em um mês específico.
+                            </p>
+                          </div>
+
+                          {cc.closingDayExceptions && Object.keys(cc.closingDayExceptions).length > 0 && (
+                            <div className="space-y-1.5">
+                              {Object.entries(cc.closingDayExceptions)
+                                .sort((a, b) => b[0].localeCompare(a[0]))
+                                .map(([month, day]) => (
+                                <div key={month} className="flex items-center justify-between bg-white dark:bg-neutral-900 p-2 rounded border text-xs">
+                                  <span className="font-medium">{month}</span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-primary font-bold">Dia {day}</span>
+                                    <button onClick={() => handleRemoveException(cc.id, month)} className="text-destructive hover:text-destructive/80">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
