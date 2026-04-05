@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy, getDocFromServer } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy, getDocFromServer, writeBatch, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { safeSetDoc } from '../lib/firestore-utils';
 import { useAuth } from './AuthContext';
@@ -74,7 +74,7 @@ interface FinanceContextType {
   addCreditCard: (card: Omit<CreditCard, 'id' | 'householdId'>) => Promise<void>;
   updateCreditCard: (id: string, card: Partial<CreditCard>) => Promise<void>;
   deleteCreditCard: (id: string) => Promise<void>;
-  recalculateTransactionsForCard: (cardId: string, monthKey?: string) => Promise<void>;
+  recalculateTransactionsForCard: (cardId: string, updatedCardData?: Partial<CreditCard>, monthKey?: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'householdId' | 'createdBy'> & { billingDay?: number }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>, mode?: 'unica' | 'futuras' | 'todos') => Promise<void>;
   deleteTransaction: (id: string, mode?: 'unica' | 'futuras' | 'todos') => Promise<void>;
@@ -746,23 +746,27 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateCreditCard = async (id: string, card: Partial<CreditCard>) => {
     if (!userProfile?.householdId) return;
     try {
-      await safeSetDoc(doc(db, 'credit_cards', id), { ...card }, { merge: true });
+      const docRef = doc(db, 'credit_cards', id);
+      await updateDoc(docRef, card);
       
       // If closingDay or exceptions changed, recalculate all transactions for this card
       if (card.closingDay !== undefined || card.closingDayExceptions !== undefined) {
-        await recalculateTransactionsForCard(id);
+        await recalculateTransactionsForCard(id, card);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `credit_cards/${id}`);
     }
   };
 
-  const recalculateTransactionsForCard = async (cardId: string, monthKey?: string) => {
+  const recalculateTransactionsForCard = async (cardId: string, updatedCardData?: Partial<CreditCard>, monthKey?: string) => {
     if (!userProfile?.householdId) return;
     
     try {
-      const card = creditCards.find(c => c.id === cardId);
-      if (!card) return;
+      const cardInState = creditCards.find(c => c.id === cardId);
+      if (!cardInState) return;
+
+      // Usamos os dados atualizados para evitar problemas de "stale state"
+      const card = { ...cardInState, ...updatedCardData };
 
       const targetTransactions = transactions.filter(t => {
         if (t.creditCardId !== cardId) return false;
@@ -772,13 +776,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         return true;
       });
 
+      if (targetTransactions.length === 0) return;
+
+      const batch = writeBatch(db);
+      let hasChanges = false;
+
       for (const t of targetTransactions) {
         const newBillingDate = calculateBillingDate(t.date, t.paymentMethod, card);
         if (newBillingDate !== t.billingDate) {
-          await safeSetDoc(doc(db, 'transactions', t.id), {
+          batch.update(doc(db, 'transactions', t.id), {
             billingDate: newBillingDate
-          }, { merge: true });
+          });
+          hasChanges = true;
         }
+      }
+
+      if (hasChanges) {
+        await batch.commit();
+        console.log(`✅ Recalculated ${targetTransactions.length} transactions for card ${card.name}`);
       }
     } catch (error) {
       console.error('Error recalculating card transactions:', error);
