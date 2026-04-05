@@ -357,41 +357,41 @@ export default function Transactions() {
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova Transação</span><span className="sm:hidden">Nova</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] h-[92vh] sm:h-auto max-h-[92vh] p-0 border-none bg-white dark:bg-neutral-900 overflow-hidden flex flex-col shadow-2xl rounded-t-2xl sm:rounded-2xl">
-                <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-2 border-b shrink-0 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md sticky top-0 z-10">
-                  <DialogTitle className="text-xl font-bold">{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</DialogTitle>
+              <DialogContent className="sm:max-w-[500px] w-full h-[95dvh] sm:h-auto sm:max-h-[90vh] rounded-t-[2.5rem] sm:rounded-2xl border-none">
+                <DialogHeader className="p-6 pb-4 border-b shrink-0 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-xl">
+                  <DialogTitle className="text-2xl font-black tracking-tight">{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</DialogTitle>
                 </DialogHeader>
                 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-24 sm:pb-6">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                  <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 pb-32">
                     {/* Bloco 1: Tipo e Valor */}
-                    <div className="space-y-4 bg-neutral-50 dark:bg-neutral-800/50 p-4 rounded-xl border border-neutral-100 dark:border-neutral-800">
-                      <div className="flex justify-center">
-                        <div className="grid grid-cols-2 w-full max-w-[240px] p-1 bg-neutral-200/50 dark:bg-neutral-800 rounded-lg">
+                    <div className="space-y-6">
+                      <div className="flex justify-center mb-2">
+                        <div className="grid grid-cols-2 w-full max-w-[280px] p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-2xl">
                           <button
                             type="button"
                             onClick={() => setType('despesa')}
-                            className={`py-1.5 px-4 rounded-md text-sm font-bold transition-all ${type === 'despesa' ? 'bg-white dark:bg-neutral-700 shadow-sm text-red-600' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${type === 'despesa' ? 'bg-white dark:bg-neutral-700 shadow-md text-red-600' : 'text-muted-foreground'}`}
                           >
                             Despesa
                           </button>
                           <button
                             type="button"
                             onClick={() => setType('receita')}
-                            className={`py-1.5 px-4 rounded-md text-sm font-bold transition-all ${type === 'receita' ? 'bg-white dark:bg-neutral-700 shadow-sm text-emerald-600' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${type === 'receita' ? 'bg-white dark:bg-neutral-700 shadow-md text-emerald-600' : 'text-muted-foreground'}`}
                           >
                             Receita
                           </button>
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">
                             {recurrenceType === 'parcelada' ? 'Valor da Parcela' : 'Valor'}
                           </Label>
                           <div className="relative group">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground group-focus-within:text-primary transition-colors">R$</span>
+                            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-muted-foreground/40 group-focus-within:text-primary transition-colors">R$</span>
                             <Input 
                               type="number" 
                               step="0.01" 
@@ -399,48 +399,31 @@ export default function Transactions() {
                               value={amount} 
                               onChange={e => handleAmountChange(e.target.value)} 
                               placeholder="0,00" 
-                              className="pl-14 h-16 text-3xl font-black rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus-visible:ring-primary/20 shadow-sm"
+                              className="pl-16 h-20 text-4xl font-black rounded-3xl border-none bg-neutral-50 dark:bg-neutral-800/50 focus-visible:ring-primary shadow-inner"
                               autoFocus={!editingTransaction}
                             />
                           </div>
                         </div>
 
-                        {recurrenceType === 'parcelada' && (
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Valor Total</Label>
-                            <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground">R$</span>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                inputMode="decimal"
-                                value={totalAmount} 
-                                onChange={e => handleTotalAmountChange(e.target.value)} 
-                                placeholder="0,00" 
-                                className="pl-12 h-12 text-xl font-bold rounded-xl border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 shadow-inner"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Descrição</Label>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Descrição</Label>
                           <Input 
                             value={description} 
                             onChange={e => setDescription(e.target.value)} 
-                            placeholder="Ex: Supermercado, Aluguel, Salário..." 
-                            className="h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus-visible:ring-primary/20"
+                            placeholder="O que você comprou?" 
+                            className="h-14 px-6 rounded-2xl border-none bg-neutral-50 dark:bg-neutral-800/50 shadow-inner font-bold text-lg"
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* Bloco 2: Método e Lançamento */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Bloco 2: Detalhes Técnicos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Método de Pagamento</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Método</Label>
                         <Select value={paymentMethod} onValueChange={(v: 'pix' | 'credito' | 'debito' | 'dinheiro') => setPaymentMethod(v)}>
-                          <SelectTrigger className="h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus:ring-primary/20">
-                            <SelectValue placeholder="Selecione o método" />
+                          <SelectTrigger className="h-14 px-6 rounded-2xl border-none bg-neutral-50 dark:bg-neutral-800/50 shadow-inner font-bold text-lg">
+                            <SelectValue placeholder="Como pagou?" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pix">PIX</SelectItem>
@@ -451,15 +434,15 @@ export default function Transactions() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Tipo de Lançamento</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Frequência</Label>
                         <Select value={recurrenceType} onValueChange={handleRecurrenceTypeChange}>
-                          <SelectTrigger className="h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus:ring-primary/20">
-                            <SelectValue placeholder="Selecione o tipo" />
+                          <SelectTrigger className="h-14 px-6 rounded-2xl border-none bg-neutral-50 dark:bg-neutral-800/50 shadow-inner font-bold text-lg">
+                            <SelectValue placeholder="É recorrente?" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="unica">Única</SelectItem>
                             <SelectItem value="parcelada">Parcelada</SelectItem>
-                            <SelectItem value="fixa">Fixa (Mensal)</SelectItem>
+                            <SelectItem value="fixa">Mensal Fixa</SelectItem>
                             <SelectItem value="assinatura">Assinatura</SelectItem>
                           </SelectContent>
                         </Select>
@@ -467,133 +450,108 @@ export default function Transactions() {
                     </div>
 
                     {paymentMethod === 'credito' && (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Qual Cartão?</Label>
+                      <div className="space-y-2 animate-in slide-in-from-top-4 duration-300">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Selecione o Cartão</Label>
                         <Select value={creditCardId} onValueChange={setCreditCardId}>
-                          <SelectTrigger className={`h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus:ring-primary/20 ${!creditCardId ? 'border-red-500' : ''}`}>
-                            <SelectValue placeholder="Selecione um cartão" />
+                          <SelectTrigger className={`h-14 px-6 rounded-2xl border-none bg-neutral-50 dark:bg-neutral-800/50 shadow-inner font-bold text-lg ${!creditCardId ? 'ring-2 ring-red-500/20 bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                            <SelectValue placeholder="Escolha um cartão" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="rounded-2xl">
                             {creditCards.length > 0 ? creditCards.map(cc => (
-                              <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>
+                              <SelectItem key={cc.id} value={cc.id} className="h-12 rounded-xl">{cc.name}</SelectItem>
                             )) : (
                               <SelectItem value="none" disabled>Nenhum cartão cadastrado</SelectItem>
                             )}
                           </SelectContent>
                         </Select>
-                        {!creditCards.length && (
-                          <p className="text-[10px] text-red-500 ml-1 font-bold">Cadastre um cartão nas configurações antes de adicionar despesas de crédito.</p>
-                        )}
                       </div>
                     )}
 
-                    {/* Bloco 3: Data e Contexto */}
-                    <div className="space-y-4 bg-neutral-50 dark:bg-neutral-800/50 p-4 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                    {/* Bloco 3: Configurações de Data */}
+                    <div className="bg-neutral-100/50 dark:bg-neutral-800/30 p-6 rounded-[2rem] space-y-6">
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">
-                          {recurrenceType === 'assinatura' || recurrenceType === 'fixa' ? 'Data de Início' : (paymentMethod === 'credito' ? 'Data da Compra' : 'Data da Transação')}
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">
+                          {recurrenceType === 'assinatura' || recurrenceType === 'fixa' ? 'Inicia em' : 'Data do gasto'}
                         </Label>
-                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900" />
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-14 px-6 rounded-2xl border-none bg-white dark:bg-neutral-800 font-bold text-lg" />
                       </div>
 
-                      {(recurrenceType === 'assinatura' || recurrenceType === 'fixa') && (
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Dia de Cobrança Mensal</Label>
-                          <div className="flex items-center gap-4">
-                            <Input 
-                              type="number" 
-                              min="1" 
-                              max="31" 
-                              value={billingDay} 
-                              onChange={e => setBillingDay(e.target.value)} 
-                              className="h-12 text-center font-bold text-xl w-24 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900"
-                            />
-                            <span className="text-sm font-medium text-muted-foreground">Todo dia {billingDay} de cada mês</span>
+                      {recurrenceType === 'parcelada' && (
+                        <div className="space-y-4 animate-in zoom-in-95 duration-300">
+                          <div className="space-y-2">
+                             <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Total de Parcelas</Label>
+                             <div className="flex items-center gap-4">
+                               <Input type="number" min="2" max="120" value={totalInstallments} onChange={e => handleInstallmentsChange(e.target.value)} className="h-14 text-center font-black text-2xl w-24 rounded-2xl border-none bg-white dark:bg-neutral-800" />
+                               <span className="text-sm font-bold text-muted-foreground">{totalInstallments}x de {formatCurrency(parseFloat(amount) || 0)}</span>
+                             </div>
+                          </div>
+                          <div className="space-y-2">
+                             <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Valor Total da Compra</Label>
+                             <div className="relative">
+                               <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground/40 font-black">R$</span>
+                               <Input type="number" step="0.01" inputMode="decimal" value={totalAmount} onChange={e => handleTotalAmountChange(e.target.value)} className="pl-14 h-14 rounded-2xl border-none bg-white/50 dark:bg-neutral-800/50 font-black text-xl" />
+                             </div>
                           </div>
                         </div>
                       )}
 
-                      {recurrenceType === 'parcelada' && (
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground ml-1">Número de Parcelas</Label>
-                          <div className="flex items-center gap-4">
-                            <Input 
-                              type="number" 
-                              min="2" 
-                              max="120" 
-                              value={totalInstallments} 
-                              onChange={e => handleInstallmentsChange(e.target.value)} 
-                              className="h-12 text-center font-bold text-xl w-24 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900"
-                            />
-                            <span className="text-sm font-medium text-muted-foreground">Vezes (ex: {totalInstallments}x de {formatCurrency(parseFloat(amount) || 0)})</span>
+                      {(recurrenceType === 'assinatura' || recurrenceType === 'fixa') && (
+                        <div className="space-y-2 animate-in zoom-in-95 duration-300">
+                          <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70 ml-1">Dia da Cobrança</Label>
+                          <div className="flex items-center gap-6">
+                            <Input type="number" min="1" max="31" value={billingDay} onChange={e => setBillingDay(e.target.value)} className="h-14 text-center font-black text-2xl w-24 rounded-2xl border-none bg-white dark:bg-neutral-800" />
+                            <span className="text-sm font-bold text-muted-foreground">Todo dia {billingDay} do mês</span>
                           </div>
                         </div>
                       )}
 
                       {type === 'despesa' && (recurrenceType === 'unica' || recurrenceType === 'parcelada') && paymentMethod !== 'credito' && (
-                        <div className="flex items-center justify-between py-1 px-1">
-                          <Label className="text-sm font-bold">Já foi realizado o pagamento?</Label>
-                          <Switch checked={status === 'pago'} onCheckedChange={(checked) => setStatus(checked ? 'pago' : 'pendente')} />
+                        <div className="flex items-center justify-between py-2">
+                          <Label className="text-sm font-black text-muted-foreground flex items-center gap-2">
+                            <CheckCircle2 className={`w-5 h-5 ${status === 'pago' ? 'text-emerald-500' : 'text-neutral-300'}`} />
+                            Marcar como Pago
+                          </Label>
+                          <Switch checked={status === 'pago'} onCheckedChange={(checked) => setStatus(checked ? 'pago' : 'pendente')} className="scale-110" />
                         </div>
                       )}
                     </div>
 
-                    {/* Bloco 4: Categoria */}
-                    <div className="space-y-2">
+                    {/* Bloco 4: Categorização */}
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center ml-1">
-                        <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Categoria</Label>
-                        <button 
-                          type="button" 
-                          onClick={() => setShowCategoriesModal(true)}
-                          className="text-[10px] uppercase font-bold text-primary hover:underline transition-all"
-                        >
-                          + Nova Categoria
-                        </button>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/70">Categoria</Label>
+                        <button type="button" onClick={() => setShowCategoriesModal(true)} className="text-[10px] uppercase font-black text-primary hover:tracking-widest transition-all">+ Nova</button>
                       </div>
                       <Select value={categoryId} onValueChange={setCategoryId}>
-                        <SelectTrigger className="h-12 rounded-xl border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-                          <SelectValue placeholder="Selecione uma categoria">
+                        <SelectTrigger className="h-16 px-6 rounded-[2rem] border-none bg-neutral-100 dark:bg-neutral-800 font-bold text-lg">
+                          <SelectValue placeholder="Onde se encaixa?">
                             {categoryId ? (
-                              <div className="flex items-center gap-3">
-                                <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: categories.find(c => c.id === categoryId)?.color }} />
-                                <span className="font-medium">{categories.find(c => c.id === categoryId)?.name}</span>
+                              <div className="flex items-center gap-4">
+                                <div className="w-4 h-4 rounded-full shadow-lg" style={{ backgroundColor: categories.find(c => c.id === categoryId)?.color }} />
+                                <span className="font-black text-foreground">{categories.find(c => c.id === categoryId)?.name}</span>
                               </div>
-                            ) : "Selecione uma categoria"}
+                            ) : "Onde se encaixa?"}
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-2xl">
                           {categories
                             .filter(c => c.type === 'ambos' || c.type === type)
                             .map(c => (
-                            <SelectItem key={c.id} value={c.id}>
-                              <div className="flex items-center gap-2">
+                            <SelectItem key={c.id} value={c.id} className="h-12 rounded-xl">
+                              <div className="flex items-center gap-3">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
-                                {c.name}
+                                <span className="font-bold">{c.name}</span>
                               </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* Resumo */}
-                    {(amount && description && categoryId) && (
-                      <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                        <p className="text-primary font-bold mb-1">Resumo da transação:</p>
-                        <p className="text-muted-foreground leading-relaxed">
-                          Criando uma <span className="font-bold text-foreground">{type}</span> de 
-                          <span className="font-bold text-foreground"> {formatCurrency(parseFloat(amount))}</span> 
-                          {recurrenceType === 'parcelada' && ` em ${totalInstallments}x`}
-                          {paymentMethod === 'credito' && ' no crédito'}
-                          {recurrenceType === 'assinatura' && ' (assinatura mensal)'}
-                          .
-                        </p>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="p-4 sm:p-6 border-t bg-white dark:bg-neutral-900 shrink-0 sticky bottom-0 z-20 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
-                    <Button type="submit" className="w-full h-14 text-lg font-black shadow-xl shadow-primary/20 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  {/* Footer Sticky na Thumb Zone */}
+                  <div className="shrink-0 p-6 pb-[env(safe-area-inset-bottom,24px)] bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-t z-[60]">
+                    <Button type="submit" className="w-full h-16 text-xl font-black rounded-2xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
                       {editingTransaction ? 'Salvar Alterações' : 'Confirmar Transação'}
                     </Button>
                   </div>

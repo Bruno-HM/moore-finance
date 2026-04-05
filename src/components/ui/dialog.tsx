@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -45,17 +46,23 @@ const DialogContent = ({ children, className }: { children: React.ReactNode, cla
   const context = React.useContext(DialogContext);
   if (!context?.open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 touch-none pointer-events-none">
       <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 pointer-events-auto" 
         onClick={() => context.onOpenChange?.(false)} 
       />
-      <div className={cn("relative z-[101] w-full max-w-lg bg-popover rounded-2xl shadow-2xl p-6 border animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto", className)}>
+      <div className={cn(
+        "relative z-[101] w-full max-w-lg bg-popover shadow-2xl border animate-in zoom-in-95 duration-200 pointer-events-auto",
+        "flex flex-col",
+        "max-h-[100dvh] sm:max-h-[90vh]", // Use Dynamic Viewport Height
+        "rounded-t-[2.5rem] sm:rounded-2xl", // Bottom sheet look on mobile
+        className
+      )}>
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-4 top-4 rounded-full opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+          className="absolute right-4 top-4 rounded-full opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none z-50 bg-background/50 backdrop-blur"
           onClick={() => context.onOpenChange?.(false)}
         >
           <XIcon className="h-4 w-4" />
@@ -63,7 +70,8 @@ const DialogContent = ({ children, className }: { children: React.ReactNode, cla
         </Button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -166,12 +166,14 @@ export default function Layout() {
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-border/50 mt-2">
-                <DropdownMenuLabel className="font-bold px-3 py-2">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-bold text-foreground leadng-none">{userProfile?.displayName}</p>
-                    <p className="text-[11px] leading-none text-muted-foreground font-medium">{userProfile?.email}</p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-bold px-3 py-2">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-bold text-foreground leadng-none">{userProfile?.displayName}</p>
+                      <p className="text-[11px] leading-none text-muted-foreground font-medium">{userProfile?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowSettings(true)} className="p-3 rounded-xl gap-3">
                   <Settings className="h-4 w-4 text-primary" />
