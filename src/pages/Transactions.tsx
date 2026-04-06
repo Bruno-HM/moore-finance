@@ -76,10 +76,10 @@ export default function Transactions() {
         const matchesStatus = statusFilter === 'todos' || t.status === statusFilter;
         const matchesCategory = categoryFilter === 'todos' || t.categoryId === categoryFilter;
         
-        // Hide recurring templates from the main flow list
-        const isRecurring = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+        // Hide recurring instances from the main flow list to keep it for avulsas/parcelas
+        const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
         
-        return matchesMonth && matchesSearch && matchesStatus && matchesCategory && !isRecurring;
+        return matchesMonth && matchesSearch && matchesStatus && matchesCategory && !isRecurrent;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, selectedMonth, searchTerm, statusFilter, categoryFilter]);

@@ -56,19 +56,22 @@ export default function Dashboard() {
         if (!dateStr) return;
         const billingDate = parseISO(dateStr);
         if (isSameMonth(billingDate, selectedMonth)) {
-          const isRecurringType = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+          // A transaction is recurrent if it has a recurringId OR a recurrent recurrenceType
+          const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+          const amount = Math.abs(Number(t.amount || 0));
 
           if (t.type === 'receita') {
             if (t.status === 'pago') {
-              income += Number(t.amount || 0);
+              income += amount;
             }
           } else {
-            if (!isRecurringType) {
+            // Include in the main list if it's NOT recurrent OR if it's a PAID recurrent item
+            // This ensures the list items sum up to the Total Expenses
+            if (!isRecurrent || t.status === 'pago') {
               list.push(t);
             }
             
-            const amount = Number(t.amount || 0);
-            // All expenses (paid + pending) go to the "all" bucket
+            // For the CATEGORY total "all" version (which includes pending)
             categoryTotalsAll[t.categoryId] = (categoryTotalsAll[t.categoryId] || 0) + amount;
 
             if (t.status === 'pago') {
@@ -102,7 +105,12 @@ export default function Dashboard() {
 
   const displayedTotal = showWithPending ? totalExpenses + totalPending : totalExpenses;
   const displayedCategories = showWithPending ? expensesByCategoryAll : expensesByCategoryPaid;
-  const finalBalance = (totalIncome + combinedSalary) - totalExpenses;
+  
+  // Real Money = Sum of all bank accounts
+  const totalEquity = (bankAccounts || []).reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
+  
+  // Monthly Impact = (Income + Salary) - Expenses (shows if current month is surplus or deficit)
+  const monthlyImpact = (totalIncome + combinedSalary) - totalExpenses;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -121,7 +129,7 @@ export default function Dashboard() {
         const dateStr = t.billingDate || t.date;
         if (!dateStr) return false;
         const matchesMonth = isSameMonth(parseISO(dateStr), selectedMonth);
-        const isRecurrent = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+        const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
         return matchesMonth && isRecurrent && t.status === 'pendente';
       } catch (e) { return false; }
     }).sort((a, b) => {
@@ -245,21 +253,33 @@ export default function Dashboard() {
               <div className="w-5 h-5 rounded-md bg-emerald-500/10 flex items-center justify-center">
                 <TrendingUp className="w-3 h-3 text-emerald-500" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Saldo Atual</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Total em Contas</span>
             </div>
             <div className="text-4xl font-black text-white mb-2 tracking-tight">
-              {formatCurrency(finalBalance)}
+              {formatCurrency(totalEquity)}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
-              <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Baseado apenas em valores pagos</p>
-            </div>
-            {totalPending > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Projeção (com pendentes)</span>
-                <span className="text-sm font-black text-amber-400">{formatCurrency((totalIncome + combinedSalary) - totalExpenses - totalPending)}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${monthlyImpact >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                  Impacto do Mês: <span className={monthlyImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                    {monthlyImpact >= 0 ? '+' : ''}{formatCurrency(monthlyImpact)}
+                  </span>
+                </p>
               </div>
-            )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Dinheiro Acumulado</span>
+                <span className="text-[10px] font-medium text-white/40 italic">Inclui saldos anteriores</span>
+              </div>
+              {totalPending > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Projeção (com pendentes)</span>
+                  <span className="text-sm font-black text-amber-400">{formatCurrency((totalIncome + combinedSalary) - totalExpenses - totalPending)}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Pending Recurrent Alerts */}
@@ -352,7 +372,12 @@ export default function Dashboard() {
                   <div className="flex items-center gap-5">
                     <div className="w-1 h-8 rounded-full opacity-30 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: cat?.color || '#333' }} />
                     <div>
-                      <p className="text-sm font-bold text-white/90 group-hover:text-white transition-colors mb-0.5">{t.title || t.description}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{t.title || t.description}</p>
+                        {(!!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura') && (
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-white/5 text-white/30 border border-white/5 uppercase tracking-widest">Fixo</span>
+                        )}
+                      </div>
                       <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">
                         {format(parseISO(t.billingDate || t.date), "dd 'de' MMM", { locale: ptBR })}
                       </p>

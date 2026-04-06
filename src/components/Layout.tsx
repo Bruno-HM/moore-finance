@@ -17,18 +17,21 @@ import { Button } from './ui/button';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
+  DropdownMenuGroup,
   DropdownMenuItem, 
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from './ui/dropdown-menu';
 import { motion, AnimatePresence } from 'motion/react';
+import SettingsModal from './SettingsModal';
 
 export default function Layout() {
   const { userProfile, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const navItems = [
     { name: 'Overview', path: '/', icon: LayoutDashboard },
@@ -85,12 +88,14 @@ export default function Layout() {
                   )}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-black/90 backdrop-blur-2xl border-white/10 rounded-2xl p-2 shadow-2xl">
-                <DropdownMenuLabel className="px-3 py-2">
-                  <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-0.5">Conta</p>
-                  <p className="text-sm font-bold text-white truncate">{userProfile?.displayName}</p>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="px-3 py-2">
+                    <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-0.5">Conta</p>
+                    <p className="text-sm font-bold text-white truncate">{userProfile?.displayName}</p>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator className="bg-white/5 mx-1" />
-                <DropdownMenuItem className="rounded-xl focus:bg-white/10 cursor-pointer py-3" onClick={() => navigate('/settings')}>
+                <DropdownMenuItem className="rounded-xl focus:bg-white/10 cursor-pointer py-3" onClick={() => setIsSettingsOpen(true)}>
                   <Settings className="mr-3 h-4 w-4 text-white/40" />
                   <span className="text-xs font-bold">Configurações</span>
                 </DropdownMenuItem>
@@ -148,6 +153,7 @@ export default function Layout() {
       {/* Subtle Background Glows */}
       <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none" />
       <div className="fixed bottom-0 right-1/4 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+      <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }
