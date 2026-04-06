@@ -1,28 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../contexts/FinanceContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ArrowDownCircle, ArrowUpCircle, Wallet, TrendingUp, RefreshCw, Info, Edit3, Trash2, User, Users, ChevronRight, Filter, Calendar, Receipt } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { RefreshCw, TrendingUp, Receipt, LayoutGrid } from 'lucide-react';
 import { format, isSameMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { MonthSelector } from '../components/MonthSelector';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { userProfile, householdMembers } = useAuth();
-  const { includePending, setIncludePending, transactions, categories, selectedMonth, recalculateRecurring, deleteTransaction } = useFinance();
+  const { householdMembers } = useAuth();
+  const { 
+    includePending, transactions, categories, 
+    selectedMonth, recalculateRecurring,
+    bankAccounts, updateTransaction
+  } = useFinance();
   const [isRecalculating, setIsRecalculating] = useState(false);
-  const [showBreakdown, setShowBreakdown] = useState(false);
-
-  const isSharedGroup = userProfile?.householdId !== userProfile?.personalHouseholdId;
 
   const combinedSalary = useMemo(() => {
     return householdMembers.reduce((sum, member) => sum + (member.salary || 0), 0);
@@ -31,8 +27,10 @@ export default function Dashboard() {
   const handleRecalculate = async () => {
     setIsRecalculating(true);
     try {
-      await recalculateRecurring();
-      toast.success('Valores recalculados e sincronizados!');
+      if (recalculateRecurring) {
+        await recalculateRecurring();
+        toast.success('Valores sincronizados!');
+      }
     } catch (error) {
       toast.error('Erro ao recalcular valores.');
     } finally {
@@ -40,483 +38,355 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeleteTransaction = async (t: any) => {
-    if (confirm('Tem certeza que deseja excluir esta transação?')) {
-      try {
-        await deleteTransaction(t.id);
-        toast.success('Transação excluída!');
-      } catch (error) {
-        toast.error('Erro ao excluir transação.');
-      }
-    }
-  };
+  const [showWithPending, setShowWithPending] = useState(false);
 
-  const { totalIncome, totalExpenses, expensesByCategory, monthlyExpensesList } = useMemo(() => {
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    const categoryTotals: Record<string, number> = {};
-    const monthlyExpensesList: any[] = [];
+  const { totalIncome, totalExpenses, totalPending, expensesByCategoryPaid, expensesByCategoryAll, monthlyExpensesList } = useMemo(() => {
+    let income = 0;
+    let expenses = 0;
+    let pending = 0;
+    const categoryTotalsPaid: Record<string, number> = {};
+    const categoryTotalsAll: Record<string, number> = {};
+    const list: any[] = [];
+
+    if (!transactions) return { totalIncome: 0, totalExpenses: 0, totalPending: 0, expensesByCategoryPaid: [], expensesByCategoryAll: [], monthlyExpensesList: [] };
 
     transactions.forEach(t => {
-      if (isSameMonth(parseISO(t.billingDate || t.date), selectedMonth)) {
-        if (t.type === 'receita') {
-          if (t.status === 'pago' || includePending) {
-            totalIncome += t.amount;
-          }
-        } else {
-          monthlyExpensesList.push(t);
-          if (t.status === 'pago' || includePending) {
-            totalExpenses += t.amount;
-            categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount;
+      try {
+        const dateStr = t.billingDate || t.date;
+        if (!dateStr) return;
+        const billingDate = parseISO(dateStr);
+        if (isSameMonth(billingDate, selectedMonth)) {
+          const isRecurringType = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+
+          if (t.type === 'receita') {
+            if (t.status === 'pago') {
+              income += Number(t.amount || 0);
+            }
+          } else {
+            if (!isRecurringType) {
+              list.push(t);
+            }
+            
+            const amount = Number(t.amount || 0);
+            // All expenses (paid + pending) go to the "all" bucket
+            categoryTotalsAll[t.categoryId] = (categoryTotalsAll[t.categoryId] || 0) + amount;
+
+            if (t.status === 'pago') {
+              expenses += amount;
+              categoryTotalsPaid[t.categoryId] = (categoryTotalsPaid[t.categoryId] || 0) + amount;
+            } else {
+              pending += amount;
+            }
           }
         }
+      } catch (e) {
+        console.error("Error processing transaction for dashboard:", t, e);
       }
     });
 
-    const expensesByCategory = Object.entries(categoryTotals).map(([categoryId, value]) => {
-      const category = categories.find(c => c.id === categoryId);
-      return {
-        name: category?.name || 'Outros',
-        value,
-        color: category?.color || '#cbd5e1'
-      };
-    }).sort((a, b) => b.value - a.value);
+    const mapCategories = (totals: Record<string, number>) => 
+      Object.entries(totals).map(([categoryId, value]) => {
+        const category = categories.find(c => c.id === categoryId);
+        return { name: category?.name || 'Outros', value, color: category?.color || '#333' };
+      }).sort((a, b) => b.value - a.value);
 
-    return { totalIncome, totalExpenses, expensesByCategory, monthlyExpensesList: monthlyExpensesList.sort((a, b) => new Date(b.billingDate || b.date).getTime() - new Date(a.billingDate || a.date).getTime()) };
-  }, [transactions, categories, selectedMonth, includePending]);
+    return { 
+      totalIncome: income, 
+      totalExpenses: expenses,
+      totalPending: pending,
+      expensesByCategoryPaid: mapCategories(categoryTotalsPaid),
+      expensesByCategoryAll: mapCategories(categoryTotalsAll),
+      monthlyExpensesList: list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    };
+  }, [transactions, categories, selectedMonth]);
 
+  const displayedTotal = showWithPending ? totalExpenses + totalPending : totalExpenses;
+  const displayedCategories = showWithPending ? expensesByCategoryAll : expensesByCategoryPaid;
   const finalBalance = (totalIncome + combinedSalary) - totalExpenses;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const filteredTransactions = useMemo(() => {
-    return transactions
-      .filter(t => {
-        const matchesMonth = isSameMonth(parseISO(t.billingDate || t.date), selectedMonth);
-        const isRecurring = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
-        return matchesMonth && !isRecurring;
-      })
-      .sort((a, b) => new Date(b.billingDate || b.date).getTime() - new Date(a.billingDate || a.date).getTime());
+  const formatParts = (value: number) => {
+    const formatted = formatCurrency(value);
+    const parts = formatted.includes(',') ? formatted.split(',') : [formatted, '00'];
+    return parts;
+  };
+
+  const pendingRecurrent = useMemo(() => {
+    if (!transactions) return [];
+    return transactions.filter(t => {
+      try {
+        const dateStr = t.billingDate || t.date;
+        if (!dateStr) return false;
+        const matchesMonth = isSameMonth(parseISO(dateStr), selectedMonth);
+        const isRecurrent = t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+        return matchesMonth && isRecurrent && t.status === 'pendente';
+      } catch (e) { return false; }
+    }).sort((a, b) => {
+      const dateA = new Date(a.billingDate || a.date).getTime();
+      const dateB = new Date(b.billingDate || b.date).getTime();
+      return dateA - dateB;
+    });
   }, [transactions, selectedMonth]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05
+  const handlePayTransaction = async (t: any) => {
+    try {
+      // Find the bank account: either from the transaction itself, or from the linked credit card
+      let accountId = t.bankAccountId;
+      if (!accountId && t.creditCardId) {
+        const cc = (transactions as any[]).find(tx => tx.creditCardId === t.creditCardId);
+        // Fallback: look in creditCards if available from context
       }
+      if (!accountId) {
+        // Fallback: use the first bank account as default for PIX/dinheiro payments
+        const { bankAccounts: accounts } = { bankAccounts };
+        if (accounts && accounts.length > 0) {
+          accountId = accounts[0].id;
+        }
+      }
+      await updateTransaction(t.id, { status: 'pago', bankAccountId: accountId });
+      toast.success('Pagamento registrado!');
+    } catch (error) {
+      toast.error('Erro ao pagar.');
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } }
-  };
-
   return (
-    <div className="space-y-8 md:space-y-12 pb-24 md:pb-8">
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-             <div className="p-2 bg-primary/10 rounded-xl">
-               <TrendingUp className="w-5 h-5 text-primary" />
-             </div>
-             <div>
-                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Painel de Controle</h2>
-                <p className="text-muted-foreground font-medium">Balanço de {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}</p>
-             </div>
-          </div>
-          
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-2xl text-[11px] font-bold uppercase tracking-wider border shadow-sm ${
-              isSharedGroup 
-                ? 'bg-primary/5 text-primary border-primary/20' 
-                : 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50'
-            }`}>
-              {isSharedGroup ? <Users className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
-              {isSharedGroup ? 'Ambiente Compartilhado' : 'Ambiente Privado'}
-            </div>
-
-            <div className="flex -space-x-3 hover:space-x-1 transition-all duration-300 items-center pl-2">
-              {householdMembers.map((member, idx) => (
-                <div key={member.uid} className="relative group cursor-pointer" style={{ zIndex: householdMembers.length - idx }}>
-                  <Avatar className="w-9 h-9 border-2 border-background ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
-                    <AvatarImage src={member.photoURL || ''} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">{member.displayName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold">
-                    {member.displayName.split(' ')[0]}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-12 pb-20">
+      {/* Header & Month Selector */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div>
+          <h2 className="text-4xl font-black tracking-tighter text-white mb-1">Fluxo de Caixa</h2>
+          <p className="text-white/40 text-sm font-medium">Situação financeira e movimentações do período.</p>
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="flex items-center gap-3">
           <Button 
-            variant="outline" 
-            size="lg"
+            variant="ghost" 
+            size="sm"
             onClick={handleRecalculate} 
             disabled={isRecalculating}
-            className="rounded-2xl border-border/50 bg-card hover:bg-muted font-bold gap-3 h-12 px-6"
+            className="h-9 px-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all"
           >
-            <RefreshCw className={`w-4 h-4 text-primary ${isRecalculating ? 'animate-spin' : ''}`} />
-            {isRecalculating ? 'Sincronizando...' : 'Sincronizar'}
+            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Sincronizar</span>
           </Button>
-
           <MonthSelector />
         </div>
       </div>
 
-      {/* Primary Stats Grid */}
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
-      >
-        <motion.div variants={itemVariants}>
-          <Card className="bg-emerald-50/30 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10 shadow-none hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 group">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Renda Extra</CardTitle>
-              <div className="p-2 bg-emerald-500/10 rounded-xl group-hover:rotate-12 transition-transform">
-                <ArrowUpCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+      {/* Main Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Expenses Summary Card */}
+        <div className="pluggy-card p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-rose-500/10 flex items-center justify-center">
+                <TrendingUp className="w-3 h-3 text-rose-500 rotate-180" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black text-emerald-700 dark:text-emerald-300 mb-1">{formatCurrency(totalIncome)}</div>
-              <p className="text-xs font-semibold text-emerald-600/60 dark:text-emerald-400/60 tracking-tight">Rendas registradas</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="bg-primary/5 border-primary/10 shadow-none hover:shadow-xl hover:shadow-primary/5 transition-all duration-500 group">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-[13px] font-bold text-primary dark:text-primary uppercase tracking-widest">
-                {isSharedGroup ? 'Soma Salários' : 'Meu Salário'}
-              </CardTitle>
-              <div className="p-2 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform">
-                <Wallet className="h-5 w-5 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black text-primary mb-1">{formatCurrency(combinedSalary)}</div>
-              <p className="text-xs font-semibold text-primary/60 tracking-tight">Total mensal fixo</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card 
-            className="bg-rose-50/30 dark:bg-rose-500/5 border-rose-100 dark:border-rose-500/10 shadow-none cursor-pointer hover:shadow-xl hover:shadow-rose-500/5 transition-all duration-500 group"
-            onClick={() => setShowBreakdown(true)}
-          >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-[13px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Despesas</CardTitle>
-              <div className="p-2 bg-rose-500/10 rounded-xl group-hover:-rotate-12 transition-transform">
-                <ArrowDownCircle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black text-rose-700 dark:text-rose-300 mb-1">{formatCurrency(totalExpenses)}</div>
-              <div className="flex items-center gap-2">
-                <div className="flex bg-rose-500/10 rounded-full p-1 group-hover:px-3 transition-all items-center gap-1">
-                   {includePending ? <Filter className="w-3 h-3 text-rose-600"/> : <TrendingUp className="w-3 h-3 text-rose-600"/>}
-                   <span className="text-[10px] font-bold uppercase text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity">Ver Detalhes</span>
-                </div>
-                <p className="text-xs font-semibold text-rose-600/60 dark:text-rose-400/60 truncate">
-                  {includePending ? 'Incluindo previstos' : 'Apenas pagas'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className={`${finalBalance >= 0 ? 'bg-card border-border/50' : 'bg-rose-600 text-white border-none shadow-lg shadow-rose-600/20'} shadow-none transition-all duration-500`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className={`text-[13px] font-bold uppercase tracking-widest ${finalBalance >= 0 ? 'text-muted-foreground' : 'text-white/80'}`}>Saldo Final</CardTitle>
-              <div className={`p-2 rounded-xl ${finalBalance >= 0 ? 'bg-primary/10' : 'bg-white/20'}`}>
-                <TrendingUp className={`h-5 w-5 ${finalBalance >= 0 ? 'text-primary' : 'text-white'}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-black mb-1 truncate ${finalBalance >= 0 ? 'text-foreground' : 'text-white'}`}>
-                {formatCurrency(finalBalance)}
-              </div>
-              <p className={`text-xs font-semibold tracking-tight ${finalBalance >= 0 ? 'text-muted-foreground/60' : 'text-white/60'}`}>Projeção final do mês</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Main Analysis Section */}
-      <div className="grid gap-8 lg:grid-cols-12 items-start">
-        {/* Categories Analysis */}
-        <Card className="lg:col-span-7 bg-card border-border/50 shadow-sm overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 pb-6 px-8 py-8">
-            <div>
-              <CardTitle className="text-xl font-extrabold tracking-tight">Distribuição de Gastos</CardTitle>
-              <CardDescription className="text-xs font-medium">Análise visual por categoria</CardDescription>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Total Despesas</span>
             </div>
-            <div className="flex bg-muted p-1 rounded-xl">
-               <Button 
-                variant={includePending ? "secondary" : "ghost"} 
-                size="sm" 
-                onClick={() => setIncludePending(true)}
-                className="h-8 text-[10px] font-bold uppercase tracking-widest rounded-lg px-3"
-              >
-                Com Pendentes
-              </Button>
-              <Button 
-                variant={!includePending ? "secondary" : "ghost"} 
-                size="sm" 
-                onClick={() => setIncludePending(false)}
-                className="h-8 text-[10px] font-bold uppercase tracking-widest rounded-lg px-3"
-              >
-                Só Pagos
-              </Button>
+            <button
+              onClick={() => setShowWithPending(!showWithPending)}
+              className="flex items-center gap-1 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-all border border-white/5"
+            >
+              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${!showWithPending ? 'text-white' : 'text-white/20'}`}>Pagos</span>
+              <span className="text-[8px] font-black text-white/10">/</span>
+              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${showWithPending ? 'text-amber-400' : 'text-white/20'}`}>Todos</span>
+            </button>
+          </div>
+          
+          <div className="mb-10">
+            <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${showWithPending ? 'text-amber-400' : 'text-rose-400'}`}>
+              {formatParts(displayedTotal)[0]}<span className="text-2xl opacity-40">,{formatParts(displayedTotal)[1]}</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-8">
-            {expensesByCategory.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div className="h-[280px] w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={expensesByCategory}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={75}
-                        outerRadius={100}
-                        paddingAngle={8}
-                        dataKey="value"
-                        stroke="none"
-                        cornerRadius={10}
-                      >
-                        {expensesByCategory.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
-                        formatter={(value: number) => formatCurrency(value)}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total</span>
-                     <span className="text-2xl font-black">{formatCurrency(totalExpenses)}</span>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {expensesByCategory.slice(0, 5).map((entry, index) => (
-                    <div key={index} className="flex items-center justify-between group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: entry.color }} />
-                        <span className="text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors">{entry.name}</span>
-                      </div>
-                      <span className="text-sm font-black">{formatCurrency(entry.value)}</span>
-                    </div>
-                  ))}
-                  {expensesByCategory.length > 5 && (
-                    <Button variant="link" className="text-xs p-0 font-bold h-auto pt-2" onClick={() => setShowBreakdown(true)}>
-                      + {expensesByCategory.length - 5} outras categorias
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="h-[280px] flex flex-col items-center justify-center gap-4 text-center">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                  <Calendar className="w-8 h-8 text-muted-foreground/40" />
-                </div>
-                <div>
-                  <p className="font-bold text-muted-foreground">Silêncio total por aqui...</p>
-                  <p className="text-xs text-muted-foreground/60">Nenhuma despesa registrada neste mês.</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Transactions */}
-        <Card className="lg:col-span-5 bg-card border-border/50 shadow-sm">
-          <CardHeader className="border-b border-border/40 pb-6 px-8 py-8 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl font-extrabold tracking-tight">Movimentações</CardTitle>
-              <CardDescription className="text-xs font-medium">Últimos registros</CardDescription>
-            </div>
-            <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate('/transactions')}>
-              <ChevronRight className="w-5 h-5 text-primary" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-8">
-            <div className="space-y-6">
-              {filteredTransactions.slice(0, 5).map((transaction, idx) => {
-                const category = categories.find(c => c.id === transaction.categoryId);
-                const creator = householdMembers.find(m => m.uid === transaction.createdBy);
-                return (
-                  <motion.div 
-                    key={transaction.id} 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="flex items-center justify-between group cursor-pointer"
-                    onClick={() => navigate('/transactions', { state: { editId: transaction.id } })}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div 
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-black/5"
-                        style={{ backgroundColor: category?.color || '#cbd5e1' }}
-                      >
-                        {transaction.type === 'receita' ? <ArrowUpCircle className="w-6 h-6" /> : <ArrowDownCircle className="w-6 h-6" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{transaction.description}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <p className="text-[10px] font-bold text-muted-foreground/60 uppercase">
-                            {format(parseISO(transaction.billingDate || transaction.date), "dd 'de' MMM", { locale: ptBR })}
-                          </p>
-                          <span className="text-muted-foreground/30 text-[10px]">•</span>
-                          <div className="flex items-center gap-1">
-                            {creator?.photoURL ? (
-                              <img src={creator.photoURL} alt="" className="w-4 h-4 rounded-full" referrerPolicy="no-referrer" />
-                            ) : (
-                              <div className="w-4 h-4 bg-muted rounded-full flex items-center justify-center">
-                                <User className="w-2.5 h-2.5 text-muted-foreground" />
-                              </div>
-                            )}
-                            <span className="text-[10px] text-muted-foreground/60 font-bold">
-                              {creator?.uid === userProfile?.uid ? 'Eu' : creator?.displayName.split(' ')[0]}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`font-black tracking-tight text-right ${transaction.type === 'receita' ? 'text-emerald-500' : 'text-foreground'}`}>
-                      {transaction.type === 'receita' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                    </div>
-                  </motion.div>
-                );
-              })}
-              {filteredTransactions.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground gap-3">
-                  <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center">
-                    <Receipt className="w-6 h-6 text-muted-foreground/30" />
-                  </div>
-                  <p className="text-sm font-bold">Sem entradas ou saídas</p>
-                </div>
+            <div className="flex items-center gap-4">
+              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{displayedCategories.length} categorias ativas</p>
+              {!showWithPending && totalPending > 0 && (
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 uppercase tracking-widest">
+                  + {formatCurrency(totalPending)} pendente
+                </span>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col p-0 rounded-[2.5rem] border-none shadow-2xl">
-          <DialogHeader className="p-8 pb-4">
-            <DialogTitle className="flex items-center justify-between text-2xl font-black">
-              Detalhamento de Despesas
-            </DialogTitle>
-             <CardDescription className="font-bold">Lista completa de gastos para {format(selectedMonth, 'MMMM', { locale: ptBR })}</CardDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-8">
-            <div className="min-w-[500px] mb-8">
-              <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-border/50">
-                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Descrição</TableHead>
-                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Categoria</TableHead>
-                  <TableHead className="text-right font-bold uppercase text-[10px] tracking-widest">Valor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {monthlyExpensesList.map((t) => {
-                  const category = categories.find(c => c.id === t.categoryId);
-                  const creator = householdMembers.find(m => m.uid === t.createdBy);
-                  const isPending = t.status === 'pendente';
-                  return (
-                    <TableRow key={t.id} className={`${isPending ? "opacity-50" : ""} border-border/40 hover:bg-muted/50 transition-colors`}>
-                      <TableCell className="py-4">
-                        <div className="font-bold text-foreground">{t.description}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex items-center gap-1">
-                            {creator?.photoURL ? (
-                              <img src={creator.photoURL} alt="" className="w-3.5 h-3.5 rounded-full" referrerPolicy="no-referrer" />
-                            ) : (
-                              <User className="w-3.5 h-3.5 text-muted-foreground" />
-                            )}
-                            <span className="text-[10px] text-muted-foreground/70 font-bold uppercase">
-                              {creator?.uid === userProfile?.uid ? 'Eu' : creator?.displayName.split(' ')[0]}
-                            </span>
-                          </div>
-                          <span className="text-muted-foreground/30 text-[10px]">•</span>
-                          <div className="text-[10px] text-muted-foreground/70 font-bold">
-                            {format(parseISO(t.billingDate || t.date), "dd/MM/yyyy")}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: category?.color || '#cbd5e1' }} />
-                          <span className="text-xs font-bold text-muted-foreground">{category?.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className={`text-sm font-black ${isPending ? "text-muted-foreground" : "text-foreground"}`}>
-                          {formatCurrency(t.amount)}
-                        </div>
-                        <div className="flex justify-end gap-1 mt-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate('/transactions', { state: { editId: t.id } });
-                            }}
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 text-destructive" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteTransaction(t);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <div className="space-y-5">
+            {displayedCategories.length > 0 ? (
+              displayedCategories.slice(0, 6).map((cat, i) => (
+                <div key={i} className="space-y-2 group cursor-default">
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-white/50 group-hover:text-white transition-colors uppercase tracking-wider">{cat.name}</span>
+                    <span className="text-white/30">{formatCurrency(cat.value)}</span>
+                  </div>
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(cat.value / (displayedTotal || 1)) * 100}%` }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+                <div className="h-40 flex flex-col items-center justify-center gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                   <Receipt className="w-5 h-5 text-white/5" />
+                   <span className="text-[10px] font-black uppercase text-white/10 tracking-widest">Nenhuma despesa</span>
+                </div>
+            )}
+          </div>
+        </div>
+
+        {/* Future/Balance Card & Secondary Info */}
+        <div className="space-y-6">
+          <div className="pluggy-card p-8">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-5 h-5 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp className="w-3 h-3 text-emerald-500" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Saldo Atual</span>
+            </div>
+            <div className="text-4xl font-black text-white mb-2 tracking-tight">
+              {formatCurrency(finalBalance)}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+              <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Baseado apenas em valores pagos</p>
+            </div>
+            {totalPending > 0 && (
+              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Projeção (com pendentes)</span>
+                <span className="text-sm font-black text-amber-400">{formatCurrency((totalIncome + combinedSalary) - totalExpenses - totalPending)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Pending Recurrent Alerts */}
+          {pendingRecurrent.length > 0 && (
+            <div className="pluggy-card p-6 border-amber-500/10 bg-amber-500/[0.03]">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Contas Pendentes</span>
+                </div>
+                <span className="text-[9px] font-black py-0.5 px-2 bg-amber-500/20 text-amber-500 rounded-full">{pendingRecurrent.length}</span>
+              </div>
+              <div className="space-y-3">
+                {pendingRecurrent.slice(0, 3).map(t => (
+                  <div key={t.id} className="flex items-center justify-between bg-white/[0.03] p-3 rounded-xl border border-white/5 group hover:bg-white/[0.06] transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white/80 truncate mb-0.5">{t.title || t.description}</p>
+                      <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">Vence {format(parseISO(t.billingDate || t.date), 'dd/MM')}</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-7 text-[9px] font-black uppercase px-3 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white rounded-lg transition-all"
+                      onClick={() => handlePayTransaction(t)}
+                    >
+                      Pagar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* User Balances List */}
+          <div className="pluggy-card p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <LayoutGrid className="w-3 h-3 text-white/20" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Contas Bancárias</span>
+            </div>
+            <div className="space-y-5">
+              {(bankAccounts || []).map(acc => {
+                const member = householdMembers.find(m => m.uid === acc.memberId);
+                return (
+                  <div key={acc.id} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-[10px] font-black text-white/30 uppercase">
+                        {acc.name.substring(0, 2)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white/70 group-hover:text-white transition-colors">{acc.name}</p>
+                        <p className="text-[9px] text-white/20 font-black uppercase tracking-tighter">{member?.displayName?.split(' ')[0] || 'Geral'}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-white/80">{formatCurrency(acc.currentBalance)}</span>
+                  </div>
+                );
+              })}
+              {(!bankAccounts || bankAccounts.length === 0) && (
+                <p className="text-[10px] font-bold text-white/10 uppercase italic text-center">Nenhuma conta vinculada</p>
+              )}
             </div>
           </div>
-          <DialogFooter className="p-8 bg-muted/30 border-t border-border/50 flex flex-row items-center justify-between sm:justify-between">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Total Calculado</span>
-              <span className="font-black text-2xl text-primary">{formatCurrency(totalExpenses)}</span>
+        </div>
+      </div>
+
+      {/* Activity / Transaction List */}
+      <div className="space-y-5">
+        <div className="flex items-center justify-between px-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Atividade Recente</span>
+          <Button 
+            variant="link" 
+            size="sm" 
+            onClick={() => navigate('/transactions')}
+            className="text-[10px] font-black uppercase text-white/40 hover:text-primary transition-colors"
+          >
+            Ver fluxo completo
+          </Button>
+        </div>
+
+        <div className="pluggy-card divide-y divide-white/5 overflow-hidden">
+          {monthlyExpensesList.length > 0 ? (
+            monthlyExpensesList.slice(0, 10).map((t) => {
+              const cat = categories.find(c => c.id === t.categoryId);
+              return (
+                <div 
+                  key={t.id} 
+                  className="group flex items-center justify-between p-5 hover:bg-white/[0.03] transition-all cursor-pointer"
+                  onClick={() => navigate('/transactions', { state: { editId: t.id } })}
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-1 h-8 rounded-full opacity-30 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: cat?.color || '#333' }} />
+                    <div>
+                      <p className="text-sm font-bold text-white/90 group-hover:text-white transition-colors mb-0.5">{t.title || t.description}</p>
+                      <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">
+                        {format(parseISO(t.billingDate || t.date), "dd 'de' MMM", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-black tracking-tight ${t.type === 'receita' ? 'text-emerald-400' : 'text-white'}`}>
+                      {t.type === 'receita' ? '+' : '-'}{formatCurrency(t.amount)}
+                    </p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/10">{cat?.name || 'Outros'}</p>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="p-20 text-center flex flex-col items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-white/10" />
+              </div>
+              <p className="text-xs font-bold text-white/20 uppercase tracking-widest">Sem movimentações este mês</p>
             </div>
-            <Button size="lg" className="rounded-2xl font-bold px-8 shadow-lg shadow-primary/20" onClick={() => setShowBreakdown(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </div>
+      </div>
+
+      {/* Discrete FAB */}
+      <div className="fixed bottom-8 right-8">
+        <Button 
+          onClick={() => navigate('/transactions', { state: { openModal: true } })} 
+          className="h-11 px-6 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
+        >
+          Novo Lançamento
+        </Button>
+      </div>
     </div>
   );
 }

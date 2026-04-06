@@ -37,6 +37,79 @@ export class TransactionController {
       res.status(500).json({ error: 'Erro interno ao buscar as transações.' });
     }
   }
+
+  async importTransactions(req: Request, res: Response): Promise<void> {
+    try {
+      const { bankAccountId, householdId, uid } = req.body;
+      const file = req.file;
+
+      if (!file || !bankAccountId || !householdId || !uid) {
+        res.status(400).json({ error: 'Dados incompletos para importação.' });
+        return;
+      }
+
+      let parsed: any[] = [];
+      const extension = file.originalname.split('.').pop()?.toLowerCase();
+
+      // Roteador de Parser
+      if (extension === 'ofx' || file.mimetype === 'application/x-ofx') {
+        const text = file.buffer.toString('utf-8');
+        const { parseOFX } = await import('../services/ofxParser');
+        parsed = parseOFX(text).map(t => ({
+          title: t.memo,
+          amount: t.amount,
+          date: t.date,
+          bankTransactionId: t.fitid,
+          type: t.type
+        }));
+      } else if (file.mimetype === 'application/pdf') {
+        const { parseSicoobPdf } = await import('../services/sicoobPdfParser');
+        const pdfTransactions = await parseSicoobPdf(file.buffer);
+        parsed = pdfTransactions.map(t => ({
+          ...t,
+          type: 'despesa', // Faturas Sicoob são consideradas despesas por padrão no crédito
+          paymentMethod: 'credito',
+          status: 'pendente'
+        }));
+      } else {
+        res.status(400).json({ error: 'Formato de arquivo não suportado.' });
+        return;
+      }
+
+      // Verificação de Idempotência e Persistência
+      const existingTransactions = await transactionRepository.getByHousehold(householdId);
+      const existingIds = new Set(existingTransactions.map(t => t.bankTransactionId).filter(Boolean));
+
+      let added = 0;
+      let skipped = 0;
+
+      for (const t of parsed) {
+        if (existingIds.has(t.bankTransactionId)) {
+          skipped++;
+          continue;
+        }
+
+        const data: any = {
+          ...t,
+          householdId,
+          createdBy: uid,
+          recurrenceType: 'unica',
+          categoryId: 'sem_categoria' // Fallback para categoria
+        };
+
+        // Delegar ao Service para calcular billingDate (faturamento de cartão)
+        await transactionService.addTransaction(data);
+        added++;
+      }
+
+      res.status(200).json({ added, skipped, total: parsed.length });
+
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message || 'Erro ao importar transações.' });
+    }
+  }
 }
 
 export const transactionController = new TransactionController();
+

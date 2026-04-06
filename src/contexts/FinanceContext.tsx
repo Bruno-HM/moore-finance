@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy, getDocFromServer, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy, getDocFromServer, writeBatch, updateDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { safeSetDoc } from '../lib/firestore-utils';
 import { useAuth } from './AuthContext';
@@ -14,9 +14,12 @@ export interface Transaction {
   categoryId: string;
   date: string;
   billingDate?: string; // When it hits the balance/invoice
-  description: string;
+  title: string;
+  description?: string;
   type: 'receita' | 'despesa';
   createdBy: string;
+  paidBy?: string; // Member ID who paid
+  bankAccountId?: string; // Bank account ID used
   status: 'pendente' | 'pago';
   paymentMethod: 'pix' | 'credito' | 'debito' | 'dinheiro';
   recurrenceType: 'unica' | 'parcelada' | 'fixa' | 'assinatura';
@@ -25,6 +28,7 @@ export interface Transaction {
   recurringId?: string;
   parentTransactionId?: string;
   creditCardId?: string;
+  bankTransactionId?: string; // Unique ID from bank statement
 }
 
 export interface CreditCard {
@@ -33,6 +37,8 @@ export interface CreditCard {
   name: string;
   closingDay: number;
   dueDay: number;
+  bankAccountId: string; // Linked bank account for payment
+  memberId: string; // The user ID this card belongs to
   closingDayExceptions?: Record<string, number>; // Format: "YYYY-MM": day
 }
 
@@ -41,14 +47,27 @@ export interface RecurringTransaction {
   householdId: string;
   amount: number;
   categoryId: string;
-  description: string;
+  title: string;
+  description?: string;
   type: 'receita' | 'despesa';
   paymentMethod: 'pix' | 'credito' | 'debito' | 'dinheiro';
   recurrenceType: 'fixa' | 'assinatura';
   startDate: string;
   billingDay?: number; // Specific day of the month for billing
   createdBy: string;
+  bankAccountId?: string; // Default bank account
+  creditCardId?: string; // Default credit card (for subscriptions)
+  paidBy?: string; // Default member
   skippedDates?: string[]; // ISO strings of the months (YYYY-MM) that were skipped
+}
+
+export interface BankAccount {
+  id: string;
+  householdId: string;
+  name: string;
+  initialBalance: number;
+  currentBalance: number;
+  memberId: string; // The user ID this account belongs to
 }
 
 export interface Category {
@@ -64,6 +83,7 @@ interface FinanceContextType {
   transactions: Transaction[];
   categories: Category[];
   creditCards: CreditCard[];
+  bankAccounts: BankAccount[];
   recurringTransactions: RecurringTransaction[];
   loading: boolean;
   currentDate: Date;
@@ -74,6 +94,9 @@ interface FinanceContextType {
   addCreditCard: (card: Omit<CreditCard, 'id' | 'householdId'>) => Promise<void>;
   updateCreditCard: (id: string, card: Partial<CreditCard>) => Promise<void>;
   deleteCreditCard: (id: string) => Promise<void>;
+  addBankAccount: (account: Omit<BankAccount, 'id' | 'householdId' | 'currentBalance'>) => Promise<void>;
+  updateBankAccount: (id: string, account: Partial<BankAccount>) => Promise<void>;
+  deleteBankAccount: (id: string) => Promise<void>;
   recalculateTransactionsForCard: (cardId: string, updatedCardData?: Partial<CreditCard>, monthKey?: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'householdId' | 'createdBy'> & { billingDay?: number }) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>, mode?: 'unica' | 'futuras' | 'todos') => Promise<void>;
@@ -81,9 +104,11 @@ interface FinanceContextType {
   updateRecurringTransaction: (id: string, transaction: Partial<RecurringTransaction>, mode?: 'este_mes' | 'futuras') => Promise<void>;
   deleteRecurringTransaction: (id: string) => Promise<void>;
   recalculateRecurring: () => Promise<void>;
+  restoreRecurringInstance: (rtId: string, monthKey: string) => Promise<void>;
   addCategory: (category: Omit<Category, 'id' | 'householdId' | 'isDefault'>) => Promise<void>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  importTransactions: (bankAccountId: string, file: File) => Promise<{ added: number, skipped: number }>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -145,11 +170,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<Date>(startOfMonth(new Date()));
   const [includePending, setIncludePending] = useState(true);
+
+  const adjustBalance = async (accountId: string | undefined, amount: number, type: 'receita' | 'despesa', undo: boolean = false) => {
+    if (!accountId) return;
+    const factor = (type === 'receita' ? 1 : -1) * (undo ? -1 : 1);
+    const adjustment = amount * factor;
+    
+    try {
+      await updateDoc(doc(db, 'bank_accounts', accountId), {
+        currentBalance: increment(adjustment)
+      });
+    } catch (error) {
+      console.error('Error adjusting balance:', error);
+    }
+  };
 
   useEffect(() => {
     console.log("✅ FinanceContext: V2 - Sanitization Active");
@@ -248,13 +288,77 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    // Listen to bank_accounts
+    const qBankAccounts = query(
+      collection(db, 'bank_accounts'),
+      where('householdId', '==', householdId)
+    );
+    const unsubscribeBankAccounts = onSnapshot(qBankAccounts, (snapshot) => {
+      const baData = snapshot.docs.map(doc => doc.data() as BankAccount);
+      setBankAccounts(baData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'bank_accounts');
+    });
+
     return () => {
       unsubscribeTransactions();
       unsubscribeCategories();
       unsubscribeRecurring();
       unsubscribeCreditCards();
+      unsubscribeBankAccounts();
     };
   }, [userProfile?.householdId]);
+
+  // Handle Auto-Pay for Credit Card transactions on billingDate
+  useEffect(() => {
+    if (loading || !transactions.length || !creditCards.length || !bankAccounts.length) return;
+
+    const processAutoPayments = async () => {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      const todayISO = today.toISOString();
+
+      const toPay = transactions.filter(t => 
+        t.status === 'pendente' && 
+        t.paymentMethod === 'credito' && 
+        t.type === 'despesa' &&
+        t.recurrenceType !== 'assinatura' && // Subscriptions are manual
+        t.recurrenceType !== 'fixa' &&        // Fixed costs are manual
+        t.billingDate && t.billingDate <= todayISO
+      );
+
+      if (toPay.length === 0) return;
+
+      const batch = writeBatch(db);
+      const accountUpdates: Record<string, number> = {};
+
+      for (const t of toPay) {
+        const cc = creditCards.find(c => c.id === t.creditCardId);
+        const accountId = cc?.bankAccountId;
+
+        if (accountId) {
+          batch.update(doc(db, 'transactions', t.id), { status: 'pago' });
+          accountUpdates[accountId] = (accountUpdates[accountId] || 0) + t.amount;
+        }
+      }
+
+      // Apply balance changes
+      for (const [accId, total] of Object.entries(accountUpdates)) {
+        batch.update(doc(db, 'bank_accounts', accId), {
+          currentBalance: increment(-total)
+        });
+      }
+
+      try {
+        await batch.commit();
+        console.log(`Auto-paid ${toPay.length} transactions`);
+      } catch (error) {
+        console.error('Error in Auto-Pay:', error);
+      }
+    };
+
+    processAutoPayments();
+  }, [loading, transactions.length, creditCards.length, bankAccounts.length]);
 
   // Auto-generate transactions for recurring ones in the selected month
   useEffect(() => {
@@ -291,7 +395,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             transactionDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), startDate.getDate());
           }
           // Find matching credit card if provided by recurrent entity (future support) or just undefined (graceful failover)
-          const cc = creditCards.find(c => c.id === (rt as any).creditCardId);
+          const cc = creditCards.find(c => c.id === rt.creditCardId);
           const billingDate = calculateBillingDate(transactionDate.toISOString(), rt.paymentMethod, cc);
 
           try {
@@ -303,12 +407,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
               date: transactionDate.toISOString(),
               billingDate: billingDate,
               description: rt.description,
+              title: rt.title,
               type: rt.type,
               createdBy: rt.createdBy,
               status: 'pendente',
               paymentMethod: rt.paymentMethod,
               recurrenceType: rt.recurrenceType,
-              recurringId: rt.id
+              recurringId: rt.id,
+              bankAccountId: rt.bankAccountId || '',
+              creditCardId: rt.creditCardId || '',
+              paidBy: rt.paidBy
             });
           } catch (error) {
             handleFirestoreError(error, OperationType.WRITE, `transactions/${id}`);
@@ -333,11 +441,22 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const startDate = new Date(transaction.date);
         const billingDay = transaction.billingDay || startDate.getDate();
 
+        // Resolve paidBy based on account/card ownership
+        let resolvedMemberId = transaction.paidBy;
+        const cc = creditCards.find(c => c.id === transaction.creditCardId);
+        if (transaction.paymentMethod === 'credito' && cc) {
+          resolvedMemberId = cc.memberId;
+        } else if (transaction.bankAccountId) {
+          const acc = bankAccounts.find(a => a.id === transaction.bankAccountId);
+          if (acc) resolvedMemberId = acc.memberId;
+        }
+
         await safeSetDoc(doc(db, 'recurring_transactions', recurringId), {
           id: recurringId,
           householdId,
           amount: transaction.amount,
           categoryId: transaction.categoryId,
+          title: transaction.title,
           description: transaction.description,
           type: transaction.type,
           paymentMethod: transaction.paymentMethod,
@@ -345,19 +464,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           startDate: transaction.date,
           billingDay: billingDay,
           createdBy: uid,
+          paidBy: resolvedMemberId,
+          bankAccountId: transaction.bankAccountId || '',
+          creditCardId: transaction.creditCardId || '',
         });
-        
+
         // Also create the first instance
         const id = uuidv4();
-        const cc = creditCards.find(c => c.id === transaction.creditCardId);
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
         await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
           createdBy: uid,
+          paidBy: resolvedMemberId,
           recurringId,
           billingDate,
+          status: 'pendente', // Subscriptions always start as pending
         });
       } else if (transaction.recurrenceType === 'parcelada' && transaction.totalInstallments) {
         const recurringId = uuidv4();
@@ -370,29 +493,65 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === transaction.creditCardId);
           const billingDate = calculateBillingDate(installmentDate.toISOString(), transaction.paymentMethod, cc);
           
+          // Resolve paidBy based on account/card ownership
+          let resolvedMemberId = transaction.paidBy;
+          if (transaction.paymentMethod === 'credito' && cc) {
+            resolvedMemberId = cc.memberId;
+          } else if (transaction.bankAccountId) {
+            const acc = bankAccounts.find(a => a.id === transaction.bankAccountId);
+            if (acc) resolvedMemberId = acc.memberId;
+          }
+
           await safeSetDoc(doc(db, 'transactions', id), {
             ...transaction,
             id,
             householdId,
             createdBy: uid,
+            paidBy: resolvedMemberId,
             date: installmentDate.toISOString(),
             billingDate,
             installmentNumber: i + 1,
             recurringId,
-            status: i === 0 ? transaction.status : 'pendente',
+            status: 'pendente', // Installments (future) are pending
           });
         }
       } else {
         const id = uuidv4();
         const cc = creditCards.find(c => c.id === transaction.creditCardId);
+        
+        // Resolve paidBy based on account/card ownership
+        let resolvedMemberId = transaction.paidBy;
+        if (transaction.paymentMethod === 'credito' && cc) {
+          resolvedMemberId = cc.memberId;
+        } else if (transaction.bankAccountId) {
+          const acc = bankAccounts.find(a => a.id === transaction.bankAccountId);
+          if (acc) resolvedMemberId = acc.memberId;
+        }
+
         const billingDate = calculateBillingDate(transaction.date, transaction.paymentMethod, cc);
+        
+        // Rules for status enforcement (only 'unica' reaches here)
+        let finalStatus = transaction.status;
+        if (transaction.paymentMethod === 'pix' || transaction.paymentMethod === 'dinheiro') {
+          finalStatus = 'pago';
+        }
+
         await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
           id,
           householdId,
           createdBy: uid,
+          paidBy: resolvedMemberId,
           billingDate,
+          status: finalStatus
         });
+
+        if (finalStatus === 'pago') {
+          const accountId = transaction.bankAccountId || (transaction.paymentMethod === 'credito' ? cc?.bankAccountId : undefined);
+          if (accountId) {
+            await adjustBalance(accountId, transaction.amount, transaction.type);
+          }
+        }
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'transactions');
@@ -412,8 +571,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           await safeSetDoc(doc(db, 'recurring_transactions', original.recurringId), {
             amount: transaction.amount ?? original.amount,
             categoryId: transaction.categoryId ?? original.categoryId,
+            title: transaction.title ?? original.title,
             description: transaction.description ?? original.description,
             paymentMethod: transaction.paymentMethod ?? original.paymentMethod,
+            bankAccountId: transaction.bankAccountId ?? original.bankAccountId,
+            paidBy: transaction.paidBy ?? original.paidBy,
           }, { merge: true });
         }
 
@@ -431,8 +593,34 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           const cc = creditCards.find(c => c.id === newCreditCardId);
           const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
+          // Handle balance for each instance if status or amount or account changed
+          const isPaid = (transaction.status ?? t.status) === 'pago';
+          const wasPaid = t.status === 'pago';
+          const newAmount = transaction.amount ?? t.amount;
+          const oldAmount = t.amount;
+          const newAccountId = transaction.bankAccountId ?? (t.bankAccountId || (newPaymentMethod === 'credito' ? cc?.bankAccountId : undefined));
+          const oldAccountId = t.bankAccountId || (t.paymentMethod === 'credito' ? creditCards.find(c => c.id === t.creditCardId)?.bankAccountId : undefined);
+
+          if (wasPaid && (!isPaid || newAccountId !== oldAccountId)) {
+            await adjustBalance(oldAccountId, oldAmount, t.type, true);
+          }
+          if (isPaid && (!wasPaid || newAccountId !== oldAccountId || newAmount !== oldAmount)) {
+             const applyUndo = wasPaid && newAccountId === oldAccountId;
+             await adjustBalance(newAccountId, applyUndo ? (newAmount - oldAmount) : newAmount, t.type);
+          }
+
+          // Resolve paidBy based on account/card ownership
+          let resolvedMemberId = transaction.paidBy ?? t.paidBy;
+          if (newPaymentMethod === 'credito' && cc) {
+            resolvedMemberId = cc.memberId;
+          } else if (newAccountId) {
+            const acc = bankAccounts.find(a => a.id === newAccountId);
+            if (acc) resolvedMemberId = acc.memberId;
+          }
+
           await safeSetDoc(doc(db, 'transactions', t.id), {
             ...transaction,
+            paidBy: resolvedMemberId,
             billingDate
           }, { merge: true });
         }
@@ -443,8 +631,43 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const cc = creditCards.find(c => c.id === newCreditCardId);
         const billingDate = calculateBillingDate(newDate, newPaymentMethod, cc);
 
+        // Balance Logic for single update
+        const isPaid = (transaction.status ?? original.status) === 'pago';
+        const wasPaid = original.status === 'pago';
+        const newAmount = transaction.amount ?? original.amount;
+        const oldAmount = original.amount;
+        const newAccountId = transaction.bankAccountId ?? (original.bankAccountId || (newPaymentMethod === 'credito' ? cc?.bankAccountId : undefined));
+        const oldAccountId = original.bankAccountId || (original.paymentMethod === 'credito' ? creditCards.find(c => c.id === original.creditCardId)?.bankAccountId : undefined);
+
+        if (wasPaid) {
+          if (!isPaid || newAccountId !== oldAccountId) {
+            // Revert old balance
+            await adjustBalance(oldAccountId, oldAmount, original.type, true);
+          }
+        }
+        
+        if (isPaid) {
+          if (!wasPaid || newAccountId !== oldAccountId) {
+            // Apply new balance
+            await adjustBalance(newAccountId, newAmount, original.type);
+          } else if (newAmount !== oldAmount) {
+            // Adjust difference
+            await adjustBalance(newAccountId, newAmount - oldAmount, original.type);
+          }
+        }
+
+        // Resolve paidBy based on account/card ownership
+        let resolvedMemberId = transaction.paidBy ?? original.paidBy;
+        if (newPaymentMethod === 'credito' && cc) {
+          resolvedMemberId = cc.memberId;
+        } else if (newAccountId) {
+          const acc = bankAccounts.find(a => a.id === newAccountId);
+          if (acc) resolvedMemberId = acc.memberId;
+        }
+
         await safeSetDoc(doc(db, 'transactions', id), {
           ...transaction,
+          paidBy: resolvedMemberId,
           billingDate
         }, { merge: true });
       }
@@ -470,6 +693,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             const newSkipped = [...(rt.skippedDates || []), monthKey];
           await safeSetDoc(doc(db, 'recurring_transactions', rt.id), { skippedDates: newSkipped }, { merge: true });
           }
+          if (transactionToDelete.status === 'pago') {
+            const cc = creditCards.find(c => c.id === transactionToDelete.creditCardId);
+            const accountId = transactionToDelete.bankAccountId || (transactionToDelete.paymentMethod === 'credito' ? cc?.bankAccountId : undefined);
+            await adjustBalance(accountId, transactionToDelete.amount, transactionToDelete.type, true);
+          }
           await deleteDoc(doc(db, 'transactions', id));
         } else {
           // Delete template if it's 'todos' or if we are deleting all future and it's fixed/subscription
@@ -484,10 +712,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           });
 
           for (const t of targetTransactions) {
+            if (t.status === 'pago') {
+              const cc = creditCards.find(c => c.id === t.creditCardId);
+              const accountId = t.bankAccountId || (t.paymentMethod === 'credito' ? cc?.bankAccountId : undefined);
+              await adjustBalance(accountId, t.amount, t.type, true);
+            }
             await deleteDoc(doc(db, 'transactions', t.id));
           }
         }
       } else {
+        if (transactionToDelete.status === 'pago') {
+          const cc = creditCards.find(c => c.id === transactionToDelete.creditCardId);
+          const accountId = transactionToDelete.bankAccountId || (transactionToDelete.paymentMethod === 'credito' ? cc?.bankAccountId : undefined);
+          await adjustBalance(accountId, transactionToDelete.amount, transactionToDelete.type, true);
+        }
         await deleteDoc(doc(db, 'transactions', id));
       }
     } catch (error) {
@@ -803,38 +1041,119 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const deleteCreditCard = async (id: string) => {
     if (!userProfile?.householdId) return;
     try {
-      // Opcional: checar se está atrelado a faturas antes de deletar
       await deleteDoc(doc(db, 'credit_cards', id));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `credit_cards/${id}`);
     }
   };
 
+  const addBankAccount = async (account: Omit<BankAccount, 'id' | 'householdId' | 'currentBalance'>) => {
+    if (!userProfile?.householdId) return;
+    const id = uuidv4();
+    try {
+      await safeSetDoc(doc(db, 'bank_accounts', id), {
+        ...account,
+        id,
+        householdId: userProfile.householdId,
+        currentBalance: account.initialBalance
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `bank_accounts/${id}`);
+    }
+  };
+
+  const updateBankAccount = async (id: string, account: Partial<BankAccount>) => {
+    if (!userProfile?.householdId) return;
+    try {
+      const original = bankAccounts.find(a => a.id === id);
+      if (account.initialBalance !== undefined && original) {
+        const diff = account.initialBalance - original.initialBalance;
+        account.currentBalance = (original.currentBalance || original.initialBalance) + diff;
+      }
+      await safeSetDoc(doc(db, 'bank_accounts', id), account, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `bank_accounts/${id}`);
+    }
+  };
+
+  const deleteBankAccount = async (id: string) => {
+    if (!userProfile?.householdId) return;
+    try {
+      await deleteDoc(doc(db, 'bank_accounts', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `bank_accounts/${id}`);
+    }
+  };
+
+  const restoreRecurringInstance = async (rtId: string, monthKey: string) => {
+    if (!userProfile?.householdId) return;
+    try {
+      const rt = recurringTransactions.find(r => r.id === rtId);
+      if (!rt) return;
+
+      const newSkipped = (rt.skippedDates || []).filter(date => date !== monthKey);
+      await safeSetDoc(doc(db, 'recurring_transactions', rtId), { skippedDates: newSkipped }, { merge: true });
+      
+      // Recalculate to trigger immediate creation
+      await recalculateRecurring();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `recurring_transactions/${rtId}`);
+    }
+  };
+
+  const importTransactions = async (bankAccountId: string, file: File): Promise<{ added: number, skipped: number }> => {
+    if (!userProfile?.householdId) throw new Error('Família não identificada.');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('bankAccountId', bankAccountId);
+    formData.append('householdId', userProfile.householdId);
+    formData.append('uid', userProfile.uid);
+
+    const response = await fetch('/api/transactions/import', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Erro ao importar transações.');
+    }
+
+    return await response.json();
+  };
+
   return (
     <FinanceContext.Provider value={{ 
       transactions, 
       categories, 
-      creditCards,
-      recurringTransactions,
+      creditCards, 
+      bankAccounts,
+      recurringTransactions, 
       loading, 
-      currentDate,
+      currentDate, 
       selectedMonth, 
-      setSelectedMonth, 
+      setSelectedMonth,
       includePending,
       setIncludePending,
-      addTransaction, 
-      updateTransaction, 
-      deleteTransaction, 
-      updateRecurringTransaction,
-      deleteRecurringTransaction,
-      recalculateRecurring,
-      addCategory,
-      updateCategory,
-      deleteCategory,
       addCreditCard,
       updateCreditCard,
       deleteCreditCard,
-      recalculateTransactionsForCard
+      addBankAccount,
+      updateBankAccount,
+      deleteBankAccount,
+      recalculateTransactionsForCard,
+      addTransaction,
+      updateTransaction,
+      deleteTransaction,
+      updateRecurringTransaction,
+      deleteRecurringTransaction,
+      recalculateRecurring,
+      restoreRecurringInstance,
+      addCategory,
+      updateCategory,
+      deleteCategory,
+      importTransactions
     }}>
       {children}
     </FinanceContext.Provider>

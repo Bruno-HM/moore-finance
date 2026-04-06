@@ -92,5 +92,13 @@ service cloud.firestore {
                     isHouseholdMember(request.resource.data.householdId);
       allow delete: if isHouseholdMember(resource.data.householdId);
     }
+
+    match /bank_accounts/{accountId} {
+      allow read: if isHouseholdMember(resource.data.householdId);
+      allow create: if isHouseholdMember(request.resource.data.householdId);
+      allow update: if isHouseholdMember(resource.data.householdId) && 
+                    isHouseholdMember(request.resource.data.householdId);
+      allow delete: if isHouseholdMember(resource.data.householdId);
+    }
   }
 }

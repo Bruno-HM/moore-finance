@@ -7,8 +7,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2 } from 'lucide-react';
+import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2, Building2, Wallet } from 'lucide-react';
 import { useFinance } from '../contexts/FinanceContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface SettingsModalProps {
   open: boolean;
@@ -16,21 +17,31 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { userProfile, updateProfile, joinHousehold, leaveHousehold } = useAuth();
+  const { userProfile, updateProfile, joinHousehold, leaveHousehold, householdMembers } = useAuth();
   const [closingDay, setClosingDay] = useState<string>('');
   const [salary, setSalary] = useState<string>('');
   const [inviteCodeInput, setInviteCodeInput] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { creditCards, addCreditCard, deleteCreditCard, updateCreditCard } = useFinance();
+  const { 
+    creditCards, addCreditCard, deleteCreditCard, updateCreditCard,
+    bankAccounts, addBankAccount, deleteBankAccount, updateBankAccount 
+  } = useFinance();
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardClosing, setNewCardClosing] = useState('');
   const [newCardDue, setNewCardDue] = useState('');
+  const [newCardBankId, setNewCardBankId] = useState('');
+  const [newCardMemberId, setNewCardMemberId] = useState(userProfile?.uid || '');
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [exceptionMonth, setExceptionMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [exceptionDay, setExceptionDay] = useState('');
+
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccBalance, setNewAccBalance] = useState('');
+  const [newAccMemberId, setNewAccMemberId] = useState(userProfile?.uid || '');
 
   useEffect(() => {
     if (userProfile?.creditCardClosingDay) {
@@ -42,6 +53,16 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
   }, [userProfile]);
 
   const isSharedGroup = userProfile?.householdId !== userProfile?.personalHouseholdId;
+
+  const getMemberName = (id: string) => {
+    const member = householdMembers.find(m => m.uid === id);
+    return member ? member.displayName : 'Desconhecido';
+  };
+
+  const getBankName = (id: string) => {
+    const bank = bankAccounts.find(b => b.id === id);
+    return bank ? bank.name : 'Sem Banco';
+  };
 
   const copyInviteCode = () => {
     if (userProfile?.inviteCode) {
@@ -105,21 +126,85 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
       return;
     }
 
+    if (!newCardBankId) {
+      toast.error('Vincule uma conta bancária ao cartão.');
+      return;
+    }
+
+    if (!newCardMemberId) {
+      toast.error('Escolha o dono do cartão.');
+      return;
+    }
+
     setActionLoading(true);
     try {
       await addCreditCard({
         name: newCardName.trim(),
         closingDay: closing,
-        dueDay: due
+        dueDay: due,
+        bankAccountId: newCardBankId,
+        memberId: newCardMemberId
       });
       toast.success('Cartão adicionado!');
       setNewCardName('');
       setNewCardClosing('');
       setNewCardDue('');
+      setNewCardBankId('');
       setShowAddCard(false);
     } catch (error) {
       console.error(error);
       toast.error('Erro ao adicionar cartão.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddAccount = async () => {
+    if (!newAccName.trim()) {
+      toast.error('Informe o nome da conta.');
+      return;
+    }
+    const balance = parseFloat(newAccBalance);
+    if (isNaN(balance)) {
+      toast.error('Informe um saldo inicial válido.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await addBankAccount({
+        name: newAccName.trim(),
+        initialBalance: balance,
+        memberId: newAccMemberId || userProfile?.uid || ''
+      });
+      toast.success('Conta bancária adicionada!');
+      setNewAccName('');
+      setNewAccBalance('');
+      setShowAddAccount(false);
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao adicionar conta.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    // Check if account is linked to any card
+    const isLinked = creditCards.some(cc => cc.bankAccountId === id);
+    if (isLinked) {
+      toast.error('Esta conta está vinculada a um cartão e não pode ser removida.');
+      return;
+    }
+
+    if (!confirm('Excluir esta conta bancária?')) return;
+    setActionLoading(true);
+    try {
+      await deleteBankAccount(id);
+      toast.success('Conta removida.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao remover conta.');
     } finally {
       setActionLoading(false);
     }
@@ -176,6 +261,30 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
       toast.success('Exceção removida.');
     } catch (error) {
       toast.error('Erro ao remover exceção.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateCardBank = async (cardId: string, bankId: string) => {
+    setActionLoading(true);
+    try {
+      await updateCreditCard(cardId, { bankAccountId: bankId });
+      toast.success('Banco do cartão atualizado!');
+    } catch (error) {
+      toast.error('Erro ao atualizar banco do cartão.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateCardMember = async (cardId: string, memberId: string) => {
+    setActionLoading(true);
+    try {
+      await updateCreditCard(cardId, { memberId });
+      toast.success('Dono do cartão atualizado!');
+    } catch (error) {
+      toast.error('Erro ao atualizar dono do cartão.');
     } finally {
       setActionLoading(false);
     }
@@ -263,6 +372,80 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
               </p>
             </div>
 
+            <div className="space-y-4 border rounded-lg p-4 bg-white dark:bg-neutral-900 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold flex items-center gap-2"><Building2 className="w-4 h-4 text-primary"/> Contas Bancárias</h4>
+                  <p className="text-xs text-muted-foreground">Onde seu dinheiro real fica guardado.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowAddAccount(!showAddAccount)}>
+                  {showAddAccount ? 'Cancelar' : <><Plus className="w-4 h-4 mr-1"/> Novo</>}
+                </Button>
+              </div>
+
+              {showAddAccount && (
+                <div className="space-y-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-md border">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Nome da Conta</Label>
+                    <Input placeholder="Ex: Nubank, Personnalité..." value={newAccName} onChange={e => setNewAccName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Saldo Inicial (R$)</Label>
+                    <Input type="number" step="0.01" value={newAccBalance} onChange={e => setNewAccBalance(e.target.value)} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Dono da Conta</Label>
+                      <Select value={newAccMemberId} onValueChange={setNewAccMemberId}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione o membro" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {householdMembers?.map(member => (
+                            <SelectItem key={member.uid} value={member.uid}>
+                              {member.displayName} {member.uid === userProfile?.uid ? '(Você)' : ''}
+                            </SelectItem>
+                          )) || (
+                            <SelectItem value={userProfile?.uid || ''}>
+                              {userProfile?.displayName} (Você)
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                  </div>
+                  <Button className="w-full" size="sm" onClick={handleAddAccount} disabled={actionLoading}>Adicionar Conta</Button>
+                </div>
+              )}
+
+              {bankAccounts.length > 0 ? (
+                <div className="space-y-2 mt-2">
+                  {bankAccounts.map(acc => (
+                    <div key={acc.id} className="flex items-center justify-between border p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                          <Wallet className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">{acc.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{getMemberName(acc.memberId)}</span>
+                            <span className="text-muted-foreground/30">•</span>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-black animate-in fade-in slide-in-from-left-2 duration-500">
+                              Saldo: R$ {acc.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteAccount(acc.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">Nenhuma conta cadastrada.</p>
+              )}
+            </div>
+
             <div className="space-y-4 border rounded-lg p-4 bg-white dark:bg-neutral-900 shadow-sm mt-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -287,6 +470,40 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       <Input type="number" min="1" max="31" value={newCardDue} onChange={e => setNewCardDue(e.target.value)} placeholder="Ex: 12" />
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Conta p/ Pagamento</Label>
+                    <Select value={newCardBankId} onValueChange={setNewCardBankId}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a conta..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bankAccounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} ({getMemberName(acc.memberId)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dono do Cartão</Label>
+                    <Select value={newCardMemberId} onValueChange={setNewCardMemberId}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione o dono..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {householdMembers?.map(member => (
+                          <SelectItem key={member.uid} value={member.uid}>
+                            {member.displayName} {member.uid === userProfile?.uid ? '(Você)' : ''}
+                          </SelectItem>
+                        )) || (
+                          <SelectItem value={userProfile?.uid || ''}>
+                            {userProfile?.displayName} (Você)
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button className="w-full" size="sm" onClick={handleAddCard} disabled={actionLoading}>Adicionar Cartão</Button>
                 </div>
               )}
@@ -302,9 +519,15 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                           </div>
                           <div>
                             <p className="text-sm font-bold">{cc.name}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                              Fechamento: {cc.closingDay} | Vencimento: {cc.dueDay}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-primary uppercase font-black tracking-widest">{getBankName(cc.bankAccountId)}</span>
+                              <span className="text-muted-foreground/30">•</span>
+                              <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{getMemberName(cc.memberId)}</span>
+                              <span className="text-muted-foreground/30">•</span>
+                              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tight">
+                                Fechamento: {cc.closingDay} | Vencimento: {cc.dueDay}
+                              </p>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -324,6 +547,46 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
 
                       {editingCardId === cc.id && (
                         <div className="mt-3 pt-3 border-t space-y-4">
+                          <div className="space-y-4 pt-2">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Banco Vinculado</Label>
+                              <Select 
+                                value={cc.bankAccountId} 
+                                onValueChange={(val) => handleUpdateCardBank(cc.id, val)}
+                                disabled={actionLoading}
+                              >
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Selecione um banco" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {bankAccounts.map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Dono do Cartão</Label>
+                              <Select 
+                                value={cc.memberId} 
+                                onValueChange={(val) => handleUpdateCardMember(cc.id, val)}
+                                disabled={actionLoading}
+                              >
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Selecione o dono" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {householdMembers?.map(member => (
+                                    <SelectItem key={member.uid} value={member.uid}>
+                                      {member.displayName} {member.uid === userProfile?.uid ? '(Você)' : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                         </div>
+
                           <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Exceções de Fechamento</Label>
                             <div className="flex gap-2">
@@ -434,13 +697,13 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+        <DialogFooter className="p-8 border-t bg-neutral-50/50 dark:bg-neutral-900/50 backdrop-blur-md rounded-b-[3rem]">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading} className="rounded-2xl font-bold h-12 px-8">
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={handleSave} disabled={loading} className="rounded-2xl font-black h-12 px-10 shadow-xl shadow-primary/20">
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Salvar Alterações
+            Salvar Tudo
           </Button>
         </DialogFooter>
       </DialogContent>

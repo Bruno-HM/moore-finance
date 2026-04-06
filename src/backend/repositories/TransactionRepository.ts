@@ -7,7 +7,8 @@ export interface TransactionData {
   categoryId: string;
   date: string;
   billingDate?: string;
-  description: string;
+  title: string;
+  description?: string;
   type: 'receita' | 'despesa';
   createdBy: string;
   status: 'pendente' | 'pago';
@@ -16,6 +17,7 @@ export interface TransactionData {
   recurringId?: string;
   totalInstallments?: number;
   installmentNumber?: number;
+  bankTransactionId?: string;
 }
 
 export class TransactionRepository {

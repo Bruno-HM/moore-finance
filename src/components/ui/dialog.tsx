@@ -28,7 +28,7 @@ const Dialog = ({ open, onOpenChange, children }: { open?: boolean, onOpenChange
   );
 };
 
-const DialogTrigger = ({ children }: { children: React.ReactNode }) => {
+const DialogTrigger = ({ children, asChild }: { children: React.ReactNode, asChild?: boolean }) => {
   const context = React.useContext(DialogContext);
   if (!context) return null;
 
