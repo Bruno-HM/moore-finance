@@ -59,7 +59,7 @@ export default function Login() {
             transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-md z-10"
           >
-            <div className="pluggy-card p-12 bg-white/[0.02] backdrop-blur-3xl border-white/[0.08] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative overflow-hidden group rounded-[2.5rem]">
+            <div className="pluggy-card p-8 sm:p-12 bg-white/[0.02] backdrop-blur-3xl border-white/[0.08] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative overflow-hidden group rounded-[2.5rem]">
               {/* Internal Glow Effect */}
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
@@ -72,10 +72,10 @@ export default function Login() {
                   className="relative"
                 >
                   <div className="absolute inset-0 bg-primary/30 blur-[40px] opacity-20 -z-10 scale-150 rounded-full" />
-                  <img
+                    <img
                     src="/icon-512.png"
                     alt="MooreFinance Logo"
-                    className="w-32 h-32 object-contain drop-shadow-[0_10px_30px_rgba(244,114,182,0.4)]"
+                    className="w-24 h-24 sm:w-32 sm:h-32 object-contain drop-shadow-[0_10px_30px_rgba(244,114,182,0.4)]"
                   />
                 </motion.div>
 
@@ -84,7 +84,7 @@ export default function Login() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5, duration: 0.6 }}
-                    className="text-5xl font-black text-white tracking-[-0.05em]"
+                    className="text-3xl sm:text-5xl font-black text-white tracking-[-0.05em]"
                   >
                     Moore<span className="text-primary italic">Finance</span>
                   </motion.h1>
@@ -106,7 +106,7 @@ export default function Login() {
                 >
                   <Button
                     onClick={signInWithGoogle}
-                    className="w-full h-16 bg-white hover:bg-neutral-100 text-black font-black text-[13px] uppercase tracking-[0.25em] rounded-2xl shadow-2xl shadow-white/5 group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+                    className="w-full h-16 bg-white hover:bg-neutral-100 text-black font-black text-[11px] sm:text-[13px] uppercase tracking-[0.1em] sm:tracking-[0.25em] rounded-2xl shadow-2xl shadow-white/5 group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
                   >
                     {/* Button Shine Animation */}
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
@@ -141,18 +141,6 @@ export default function Login() {
             </div>
           </motion.div>
 
-          {/* Version Tag */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2, duration: 1 }}
-            className="absolute bottom-8 flex flex-col items-center space-y-2"
-          >
-            <span className="text-[9px] uppercase font-black tracking-[0.5em] text-white/20">
-              Algorithmic Design v2 &copy; {new Date().getFullYear()}
-            </span>
-            <div className="w-12 h-[1px] bg-white/10" />
-          </motion.div>
         </>
       )}
     </div>

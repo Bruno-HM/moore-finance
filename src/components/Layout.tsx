@@ -75,7 +75,7 @@ export default function Layout() {
 
           <div className="flex items-center gap-4">
             <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-9 w-9 rounded-xl overflow-hidden border border-white/10 hover:border-white/20 transition-all bg-white/5 flex items-center justify-center hover:bg-white/10 outline-none">
+              <DropdownMenuTrigger id="btn-settings" className="relative h-9 w-9 rounded-xl overflow-hidden border border-white/10 hover:border-white/20 transition-all bg-white/5 flex items-center justify-center hover:bg-white/10 outline-none">
                   {userProfile?.photoURL ? (
                     <img
                       src={userProfile.photoURL}
@@ -108,6 +108,7 @@ export default function Layout() {
 
             {/* Mobile Menu Toggle */}
             <button 
+              id="btn-mobile-menu"
               className="md:hidden p-2 text-white/50 hover:text-white transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >

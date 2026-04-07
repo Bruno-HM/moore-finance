@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../contexts/FinanceContext';
 import { Button } from '../components/ui/button';
@@ -12,20 +12,37 @@ import { motion } from 'motion/react';
 import TransactionModal from '../components/TransactionModal';
 import CategoryDetailModal from '../components/CategoryDetailModal';
 import { Transaction } from '../contexts/FinanceContext';
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import OnboardingWizard from '../components/OnboardingWizard';
+import '../styles/driver-custom.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { householdMembers } = useAuth();
+  const { householdMembers, userProfile, updateProfile, loading: authLoading } = useAuth();
   const {
     includePending, transactions, categories,
     selectedMonth, recalculateRecurring,
-    bankAccounts, updateTransaction
+    bankAccounts, updateTransaction,
+    loading: financeLoading
   } = useFinance();
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isCategoryDetailOpen, setIsCategoryDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [hasStartedTour, setHasStartedTour] = useState(false);
+
+  // Auto-start tour for existing users who haven't completed it
+  useEffect(() => {
+    if (!authLoading && !financeLoading && !userProfile?.tutorialCompleted && (bankAccounts?.length || 0) > 0 && !hasStartedTour) {
+      const timer = setTimeout(() => {
+        setHasStartedTour(true);
+        startTour();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, financeLoading, userProfile?.tutorialCompleted, bankAccounts?.length, hasStartedTour]);
 
   const combinedSalary = useMemo(() => {
     return householdMembers.reduce((sum, member) => sum + (member.salary || 0), 0);
@@ -43,6 +60,93 @@ export default function Dashboard() {
     } finally {
       setIsRecalculating(false);
     }
+  };
+
+  const startTour = () => {
+    const isMobile = window.innerWidth < 768;
+    const steps: any[] = [
+      { 
+        element: '#btn-settings', 
+        popover: { 
+          title: 'Gestão e Perfil', 
+          description: 'Aqui você ajusta seu salário, gerencia membros do grupo e acessa as configurações globais.',
+          side: 'bottom',
+          align: 'end'
+        } 
+      }
+    ];
+
+    if (isMobile) {
+      steps.push({
+        element: '#btn-mobile-menu',
+        popover: {
+          title: 'Navegação Mobile',
+          description: 'No celular, use este menu para alternar entre as principais telas do sistema.',
+          side: 'bottom',
+          align: 'end'
+        }
+      });
+    }
+
+    steps.push(
+      { 
+        element: '#btn-add-transaction', 
+        popover: { 
+          title: 'Novo Lançamento', 
+          description: 'Registre seus gastos e ganhos avulsos rapidamente. O sistema recalcula tudo em tempo real.',
+          side: 'top',
+          align: 'center'
+        },
+        onHighlightStarted: () => {
+          if (window.location.pathname !== '/') navigate('/');
+        }
+      },
+      { 
+        element: '#btn-add-recurring', 
+        popover: { 
+          title: 'Automação de Fixos', 
+          description: 'Cadastre aqui suas contas recorrentes (Aluguel, Luz, etc). Elas serão projetadas automaticamente nos próximos meses.',
+          side: 'left',
+          align: 'center'
+        },
+        onHighlightStarted: () => {
+          if (window.location.pathname !== '/recurring') navigate('/recurring');
+        }
+      }
+    );
+
+    const d = driver({
+      showProgress: true,
+      animate: true,
+      overlayColor: 'rgba(0, 0, 0, 0.85)',
+      popoverClass: 'moore-tour-popover',
+      stagePadding: 10,
+      allowClose: false,
+      nextBtnText: 'Próximo',
+      prevBtnText: 'Anterior',
+      doneBtnText: 'Concluir',
+      onCloseClick: () => {
+        const confirmResult = window.confirm("Deseja realmente cancelar o tutorial? Você poderá refazê-lo depois nas configurações.");
+        if (confirmResult) {
+          d.destroy();
+        }
+      },
+      steps,
+      onDestroyed: async () => {
+        // Mark as completed when the tour ends (either naturally or closed)
+        if (updateProfile) {
+          await updateProfile({ tutorialCompleted: true });
+          toast.success("Tudo pronto! Bem-vindo ao MooreFinance.");
+        }
+      }
+    });
+
+    d.drive();
+  };
+
+  const handleStartTour = () => {
+    setHasStartedTour(true);
+    startTour();
   };
 
   const [expenseFilter, setExpenseFilter] = useState<'todos' | 'pago' | 'pendente'>('todos');
@@ -113,15 +217,15 @@ export default function Dashboard() {
     };
   }, [transactions, categories, selectedMonth]);
 
-  const displayedTotal = 
+  const displayedTotal =
     expenseFilter === 'todos' ? totalExpenses + totalPending :
-    expenseFilter === 'pago' ? totalExpenses : 
-    totalPending;
+      expenseFilter === 'pago' ? totalExpenses :
+        totalPending;
 
-  const displayedCategories = 
+  const displayedCategories =
     expenseFilter === 'todos' ? expensesByCategoryAll :
-    expenseFilter === 'pago' ? expensesByCategoryPaid :
-    expensesByCategoryPending;
+      expenseFilter === 'pago' ? expensesByCategoryPaid :
+        expensesByCategoryPending;
 
   // Real Money = Sum of all bank accounts
   const totalEquity = (bankAccounts || []).reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
@@ -229,8 +333,8 @@ export default function Dashboard() {
     );
 
     // 3. Filter pending instances that DON'T have a paid counterpart
-    const pendingWithNoPaid = allRecurrentThisMonth.filter(t => 
-      t.status === 'pendente' && 
+    const pendingWithNoPaid = allRecurrentThisMonth.filter(t =>
+      t.status === 'pendente' &&
       (!t.recurringId || !paidRecurringIds.has(t.recurringId))
     );
 
@@ -362,11 +466,10 @@ export default function Dashboard() {
           </div>
 
           <div className="mb-10">
-            <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${
-              expenseFilter === 'todos' ? 'text-amber-400' : 
-              expenseFilter === 'pago' ? 'text-rose-400' : 
-              'text-rose-500'
-            }`}>
+            <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${expenseFilter === 'todos' ? 'text-amber-400' :
+                expenseFilter === 'pago' ? 'text-rose-400' :
+                  'text-rose-500'
+              }`}>
               {formatParts(displayedTotal)[0]}<span className="text-2xl opacity-40">,{formatParts(displayedTotal)[1]}</span>
             </div>
             <div className="flex items-center gap-4">
@@ -604,12 +707,17 @@ export default function Dashboard() {
       {/* Discrete FAB */}
       <div className="fixed bottom-8 right-8">
         <Button
+          id="btn-add-transaction"
           onClick={() => { setEditingTransaction(null); setIsTransactionModalOpen(true); }}
           className="h-11 px-6 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-2xl hover:scale-105 active:scale-90 transition-all shadow-white/20"
         >
           Novo Lançamento
         </Button>
       </div>
+
+      {!authLoading && !financeLoading && userProfile && !userProfile.tutorialCompleted && (bankAccounts?.length || 0) === 0 && (
+        <OnboardingWizard onComplete={handleStartTour} />
+      )}
 
       <TransactionModal
         isOpen={isTransactionModalOpen}

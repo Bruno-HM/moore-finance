@@ -16,6 +16,7 @@ interface UserProfile {
   inviteCode?: string | null;
   creditCardClosingDay?: number;
   salary?: number;
+  tutorialCompleted?: boolean;
 }
 
 interface AuthContextType {
@@ -77,7 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 await safeSetDoc(userRef, { 
                   personalHouseholdId: personalId,
-                  householdId: userData.householdId || personalId 
+                  householdId: userData.householdId || personalId,
+                  tutorialCompleted: userData.tutorialCompleted ?? false
                 }, { merge: true });
                 return; // Snapshot will trigger again
               } catch (err) {
@@ -367,6 +369,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userRef = doc(db, 'users', user.uid);
     try {
       await safeSetDoc(userRef, data, { merge: true });
+      
+      // Update local state immediately to avoid race conditions with snapshots
+      // and prevent issues like the tour re-triggering during navigation.
+      setUserProfile(prev => prev ? { ...prev, ...data } : null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
     }

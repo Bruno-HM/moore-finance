@@ -209,6 +209,7 @@ export default function RecurringTransactions() {
       {/* FAB - Criar Novo */}
       <div className="fixed bottom-8 right-8 z-50">
         <Button 
+          id="btn-add-recurring"
           onClick={() => setIsModalOpen(true)}
           className="w-14 h-14 rounded-2xl bg-primary text-black shadow-2xl shadow-primary/30 hover:scale-110 active:scale-90 transition-all flex items-center justify-center p-0"
         >

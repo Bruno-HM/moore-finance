@@ -1,0 +1,113 @@
+/* Custom Driver.js Styling for MooreFinance */
+
+.driver-popover.moore-tour-popover {
+  background-color: rgba(10, 10, 10, 0.9) !important;
+  backdrop-filter: blur(25px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 2rem !important;
+  padding: 32px !important;
+  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8) !important;
+  max-width: 340px !important;
+  color: white !important;
+  font-family: inherit !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-title {
+  font-size: 1.35rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.03em !important;
+  color: white !important;
+  margin-bottom: 10px !important;
+  line-height: 1.2 !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-description {
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  line-height: 1.7 !important;
+  margin-bottom: 24px !important;
+}
+
+/* Control Buttons Container */
+.driver-popover.moore-tour-popover .driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-top: 24px !important;
+  padding-top: 16px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-btn {
+  height: 44px !important;
+  padding: 0 20px !important;
+  border-radius: 1rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.15em !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: none !important;
+  cursor: pointer !important;
+  text-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 90px !important;
+}
+
+/* Next / Done Button */
+.driver-popover.moore-tour-popover .driver-popover-next-btn {
+  background-color: oklch(0.7 0.15 340) !important;
+  color: white !important;
+  flex: 2 !important;
+  box-shadow: 0 8px 20px rgba(244, 114, 182, 0.2) !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-next-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 25px rgba(244, 114, 182, 0. 3) !important;
+  filter: brightness(1.1) !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-next-btn:active {
+  transform: scale(0.96) !important;
+}
+
+/* Prev / Close Button */
+.driver-popover.moore-tour-popover .driver-popover-prev-btn,
+.driver-popover.moore-tour-popover .driver-popover-close-btn {
+  background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  flex: 1 !important;
+}
+
+.driver-popover.moore-tour-popover .driver-popover-prev-btn:hover,
+.driver-popover.moore-tour-popover .driver-popover-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Progress text */
+.driver-popover.moore-tour-popover .driver-popover-progress-text {
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  color: rgba(255, 255, 255, 0.2) !important;
+  letter-spacing: 0.2em !important;
+  position: absolute !important;
+  top: 32px !important;
+  right: 32px !important;
+}
+
+/* Highlighted Stage */
+.driver-stage {
+  background-color: transparent !important;
+  border: 1px solid rgba(244, 114, 182, 0.3) !important;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8) !important;
+  border-radius: 1.25rem !important;
+}
