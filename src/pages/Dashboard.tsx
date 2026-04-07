@@ -383,7 +383,6 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Dinheiro Acumulado</span>
                 <span className="text-[10px] font-medium text-white/40 italic">Inclui saldos anteriores</span>
               </div>
               {totalPending > 0 && (

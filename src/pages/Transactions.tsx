@@ -200,7 +200,7 @@ export default function Transactions() {
                         <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-wider text-white/20">
                           <span>{cat?.name}</span>
                           <span>•</span>
-                          <span>{creator?.displayName.split(' ')[0]}</span>
+                          <span>{creator?.displayName?.split(' ')[0] || 'Desconhecido'}</span>
                           {t.status === 'pendente' && (
                             <span className="text-amber-500/80 ml-1">Pendente</span>
                           )}
