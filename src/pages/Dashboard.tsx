@@ -2,23 +2,30 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../contexts/FinanceContext';
 import { Button } from '../components/ui/button';
-import { RefreshCw, TrendingUp, Receipt, LayoutGrid } from 'lucide-react';
-import { format, isSameMonth, parseISO } from 'date-fns';
+import { RefreshCw, TrendingUp, Receipt, LayoutGrid, Sparkles, ArrowUpRight } from 'lucide-react';
+import { format, isSameMonth, parseISO, addMonths, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { MonthSelector } from '../components/MonthSelector';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
+import TransactionModal from '../components/TransactionModal';
+import CategoryDetailModal from '../components/CategoryDetailModal';
+import { Transaction } from '../contexts/FinanceContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { householdMembers } = useAuth();
-  const { 
-    includePending, transactions, categories, 
+  const {
+    includePending, transactions, categories,
     selectedMonth, recalculateRecurring,
     bankAccounts, updateTransaction
   } = useFinance();
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [isCategoryDetailOpen, setIsCategoryDetailOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
 
   const combinedSalary = useMemo(() => {
     return householdMembers.reduce((sum, member) => sum + (member.salary || 0), 0);
@@ -38,7 +45,7 @@ export default function Dashboard() {
     }
   };
 
-  const [showWithPending, setShowWithPending] = useState(false);
+  const [showWithPending, setShowWithPending] = useState(true);
 
   const { totalIncome, totalExpenses, totalPending, expensesByCategoryPaid, expensesByCategoryAll, monthlyExpensesList } = useMemo(() => {
     let income = 0;
@@ -70,7 +77,7 @@ export default function Dashboard() {
             if (!isRecurrent || t.status === 'pago') {
               list.push(t);
             }
-            
+
             // For the CATEGORY total "all" version (which includes pending)
             categoryTotalsAll[t.categoryId] = (categoryTotalsAll[t.categoryId] || 0) + amount;
 
@@ -87,14 +94,14 @@ export default function Dashboard() {
       }
     });
 
-    const mapCategories = (totals: Record<string, number>) => 
+    const mapCategories = (totals: Record<string, number>) =>
       Object.entries(totals).map(([categoryId, value]) => {
         const category = categories.find(c => c.id === categoryId);
         return { name: category?.name || 'Outros', value, color: category?.color || '#333' };
       }).sort((a, b) => b.value - a.value);
 
-    return { 
-      totalIncome: income, 
+    return {
+      totalIncome: income,
       totalExpenses: expenses,
       totalPending: pending,
       expensesByCategoryPaid: mapCategories(categoryTotalsPaid),
@@ -105,12 +112,84 @@ export default function Dashboard() {
 
   const displayedTotal = showWithPending ? totalExpenses + totalPending : totalExpenses;
   const displayedCategories = showWithPending ? expensesByCategoryAll : expensesByCategoryPaid;
-  
+
   // Real Money = Sum of all bank accounts
   const totalEquity = (bankAccounts || []).reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
-  
+
   // Monthly Impact = (Income + Salary) - Expenses (shows if current month is surplus or deficit)
   const monthlyImpact = (totalIncome + combinedSalary) - totalExpenses;
+
+  // Potential Monthly Impact for the SELECTED month
+  // NOTE: We don't add combinedSalary to the current month's projection if it's already passed/started 
+  // because the money is likely already in the bank accounts (totalEquity).
+  // But for FUTURE months, the salary is a new expected inflow.
+  const isSelectedCurrent = isSameMonth(selectedMonth, new Date());
+
+  const potentialMonthlyImpact = (totalIncome + (isSelectedCurrent ? 0 : combinedSalary)) - (totalExpenses + totalPending);
+
+  // USER'S CUMULATIVE FORECAST LOGIC
+  const nextMonthProjectedTotal = useMemo(() => {
+    if (!transactions) return totalEquity;
+
+    const today = startOfMonth(new Date());
+    const targetMonth = startOfMonth(selectedMonth);
+
+    // If looking at current or past, just show current equity
+    if (targetMonth <= today) return totalEquity;
+
+    // 1. Calculate how much will be left at the end of THE CURRENT MONTH
+    // We take today's balance and subtract ONLY what is still PENDING for this month
+    // because "Paid" items are already gone from totalEquity.
+    let todayPendingExpenses = 0;
+    transactions.forEach(t => {
+      const dateStr = t.billingDate || t.date;
+      if (!dateStr) return;
+      const tDate = parseISO(dateStr);
+      if (isSameMonth(tDate, today) && t.type === 'despesa' && t.status === 'pendente') {
+        todayPendingExpenses += Math.abs(Number(t.amount || 0));
+      }
+    });
+
+    // Starting balance for the next month chain (Projected End of Current Month)
+    let rollingBalance = totalEquity - todayPendingExpenses;
+
+    // 2. Iterate from the month AFTER today up to targetMonth
+    let currentIterMonth = addMonths(today, 1);
+
+    while (currentIterMonth <= targetMonth) {
+      let monthIncome = 0;
+      let monthExpenses = 0;
+
+      transactions.forEach(t => {
+        const dateStr = t.billingDate || t.date;
+        if (!dateStr) return;
+        const tDate = parseISO(dateStr);
+
+        if (isSameMonth(tDate, currentIterMonth)) {
+          const amount = Math.abs(Number(t.amount || 0));
+          if (t.type === 'receita') {
+            monthIncome += amount;
+          } else {
+            // Only subtract expenses if it's NOT the target month
+            // User wants the "Start of Month" balance (Income + Salary - Previous Month Expenses)
+            if (currentIterMonth < targetMonth) {
+              monthExpenses += amount;
+            }
+          }
+        }
+      });
+
+      rollingBalance += (monthIncome + combinedSalary) - monthExpenses;
+      currentIterMonth = addMonths(currentIterMonth, 1);
+    }
+
+    return rollingBalance;
+  }, [transactions, selectedMonth, totalEquity, combinedSalary]);
+
+  const nextMonthDate = addMonths(new Date(), 1);
+  const isFutureMonth = startOfMonth(selectedMonth) > startOfMonth(new Date());
+  const isNextMonth = isSameMonth(selectedMonth, nextMonthDate);
+  const nextMonthNameLabel = format(selectedMonth, 'MMMM', { locale: ptBR });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -161,6 +240,36 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditTransaction = (t: Transaction) => {
+    setEditingTransaction(t);
+    setIsTransactionModalOpen(true);
+  };
+
+  const handleCategoryClick = (cat: any) => {
+    const categoryData = categories.find(c => c.name === cat.name);
+    if (!categoryData) return;
+
+    setSelectedCategory(categoryData);
+    setIsCategoryDetailOpen(true);
+  };
+
+  const categoryTransactions = useMemo(() => {
+    if (!selectedCategory || !transactions) return [];
+    return transactions.filter(t => {
+      const dateStr = t.billingDate || t.date;
+      if (!dateStr) return false;
+      const matchesMonth = isSameMonth(parseISO(dateStr), selectedMonth);
+      const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+      const matchesCategory = t.categoryId === selectedCategory.id;
+
+      // Mirror the filtering logic from the summary
+      if (showWithPending) {
+        return matchesMonth && matchesCategory;
+      }
+      return matchesMonth && matchesCategory && t.status === 'pago';
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, selectedCategory, selectedMonth, showWithPending]);
+
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-20">
       {/* Header & Month Selector */}
@@ -170,10 +279,10 @@ export default function Dashboard() {
           <p className="text-white/40 text-sm font-medium">Situação financeira e movimentações do período.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
-            onClick={handleRecalculate} 
+            onClick={handleRecalculate}
             disabled={isRecalculating}
             className="h-9 px-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all"
           >
@@ -199,12 +308,12 @@ export default function Dashboard() {
               onClick={() => setShowWithPending(!showWithPending)}
               className="flex items-center gap-1 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-all border border-white/5"
             >
-              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${!showWithPending ? 'text-white' : 'text-white/20'}`}>Pagos</span>
-              <span className="text-[8px] font-black text-white/10">/</span>
               <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${showWithPending ? 'text-amber-400' : 'text-white/20'}`}>Todos</span>
+              <span className="text-[8px] font-black text-white/10">/</span>
+              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${!showWithPending ? 'text-white' : 'text-white/20'}`}>Pagos</span>
             </button>
           </div>
-          
+
           <div className="mb-10">
             <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${showWithPending ? 'text-amber-400' : 'text-rose-400'}`}>
               {formatParts(displayedTotal)[0]}<span className="text-2xl opacity-40">,{formatParts(displayedTotal)[1]}</span>
@@ -222,13 +331,17 @@ export default function Dashboard() {
           <div className="space-y-5">
             {displayedCategories.length > 0 ? (
               displayedCategories.slice(0, 6).map((cat, i) => (
-                <div key={i} className="space-y-2 group cursor-default">
+                <div
+                  key={i}
+                  className="space-y-2 group cursor-pointer active:scale-[0.98] transition-all"
+                  onClick={() => handleCategoryClick(cat)}
+                >
                   <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-white/50 group-hover:text-white transition-colors uppercase tracking-wider">{cat.name}</span>
+                    <span className="text-white/50 group-hover:text-primary transition-colors uppercase tracking-wider">{cat.name}</span>
                     <span className="text-white/30">{formatCurrency(cat.value)}</span>
                   </div>
                   <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${(cat.value / (displayedTotal || 1)) * 100}%` }}
                       className="h-full rounded-full"
@@ -238,10 +351,10 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-                <div className="h-40 flex flex-col items-center justify-center gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
-                   <Receipt className="w-5 h-5 text-white/5" />
-                   <span className="text-[10px] font-black uppercase text-white/10 tracking-widest">Nenhuma despesa</span>
-                </div>
+              <div className="h-40 flex flex-col items-center justify-center gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                <Receipt className="w-5 h-5 text-white/5" />
+                <span className="text-[10px] font-black uppercase text-white/10 tracking-widest">Nenhuma despesa</span>
+              </div>
             )}
           </div>
         </div>
@@ -276,11 +389,42 @@ export default function Dashboard() {
               {totalPending > 0 && (
                 <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
                   <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Projeção (com pendentes)</span>
-                  <span className="text-sm font-black text-amber-400">{formatCurrency((totalIncome + combinedSalary) - totalExpenses - totalPending)}</span>
+                  <span className="text-sm font-black text-amber-400">
+                    {formatCurrency(totalEquity - (isSelectedCurrent ? totalPending : (totalExpenses + totalPending - (totalIncome + combinedSalary))))}
+                  </span>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Future Forecast Card - Shows when ANY future month is selected */}
+          {isFutureMonth && (
+            <div className="pluggy-card p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border-indigo-500/20 shadow-xl shadow-indigo-500/5 group animate-in zoom-in-95 duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Saldo Inicial Estimado</p>
+                    <p className="text-xs font-bold text-white capitalize">{nextMonthNameLabel}</p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/20 transition-all">
+                  <ArrowUpRight className="w-4 h-4 text-white/30 group-hover:text-indigo-400" />
+                </div>
+              </div>
+
+              <div className="text-2xl font-black text-white mb-3 flex items-baseline gap-1">
+                <span>{formatParts(nextMonthProjectedTotal)[0]}</span>
+                <span className="text-sm opacity-40">,{formatParts(nextMonthProjectedTotal)[1]}</span>
+              </div>
+
+              <p className="text-[10px] leading-relaxed text-white/40 font-medium italic">
+                Previsão de quanto você terá disponível em {nextMonthNameLabel} (Saldo + Salário) antes de pagar as contas do mês.
+              </p>
+            </div>
+          )}
 
           {/* Pending Recurrent Alerts */}
           {pendingRecurrent.length > 0 && (
@@ -294,16 +438,20 @@ export default function Dashboard() {
               </div>
               <div className="space-y-3">
                 {pendingRecurrent.slice(0, 3).map(t => (
-                  <div key={t.id} className="flex items-center justify-between bg-white/[0.03] p-3 rounded-xl border border-white/5 group hover:bg-white/[0.06] transition-colors">
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between bg-white/[0.03] p-3 rounded-xl border border-white/5 group hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    onClick={() => handleEditTransaction(t)}
+                  >
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-white/80 truncate mb-0.5">{t.title || t.description}</p>
+                      <p className="text-xs font-bold text-white/80 group-hover:text-primary transition-colors truncate mb-0.5">{t.title || t.description}</p>
                       <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">Vence {format(parseISO(t.billingDate || t.date), 'dd/MM')}</p>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-7 text-[9px] font-black uppercase px-3 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white rounded-lg transition-all"
-                      onClick={() => handlePayTransaction(t)}
+                      onClick={(e) => { e.stopPropagation(); handlePayTransaction(t); }}
                     >
                       Pagar
                     </Button>
@@ -349,9 +497,9 @@ export default function Dashboard() {
       <div className="space-y-5">
         <div className="flex items-center justify-between px-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Atividade Recente</span>
-          <Button 
-            variant="link" 
-            size="sm" 
+          <Button
+            variant="link"
+            size="sm"
             onClick={() => navigate('/transactions')}
             className="text-[10px] font-black uppercase text-white/40 hover:text-primary transition-colors"
           >
@@ -364,10 +512,10 @@ export default function Dashboard() {
             monthlyExpensesList.slice(0, 10).map((t) => {
               const cat = categories.find(c => c.id === t.categoryId);
               return (
-                <div 
-                  key={t.id} 
+                <div
+                  key={t.id}
                   className="group flex items-center justify-between p-5 hover:bg-white/[0.03] transition-all cursor-pointer"
-                  onClick={() => navigate('/transactions', { state: { editId: t.id } })}
+                  onClick={() => handleEditTransaction(t)}
                 >
                   <div className="flex items-center gap-5">
                     <div className="w-1 h-8 rounded-full opacity-30 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: cat?.color || '#333' }} />
@@ -405,13 +553,27 @@ export default function Dashboard() {
 
       {/* Discrete FAB */}
       <div className="fixed bottom-8 right-8">
-        <Button 
-          onClick={() => navigate('/transactions', { state: { openModal: true } })} 
-          className="h-11 px-6 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
+        <Button
+          onClick={() => { setEditingTransaction(null); setIsTransactionModalOpen(true); }}
+          className="h-11 px-6 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-2xl hover:scale-105 active:scale-90 transition-all shadow-white/20"
         >
           Novo Lançamento
         </Button>
       </div>
+
+      <TransactionModal
+        isOpen={isTransactionModalOpen}
+        onOpenChange={setIsTransactionModalOpen}
+        editingTransaction={editingTransaction}
+      />
+
+      <CategoryDetailModal
+        isOpen={isCategoryDetailOpen}
+        onOpenChange={setIsCategoryDetailOpen}
+        categoryName={selectedCategory?.name || ''}
+        categoryColor={selectedCategory?.color || '#333'}
+        transactions={categoryTransactions}
+      />
     </div>
   );
 }

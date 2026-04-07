@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2, Building2, Wallet, Tag } from 'lucide-react';
+import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2, Building2, Wallet, Tag, RefreshCw } from 'lucide-react';
 import { useFinance, CreditCard } from '../contexts/FinanceContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -17,7 +17,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { userProfile, updateProfile, joinHousehold, leaveHousehold, householdMembers } = useAuth();
+  const { userProfile, updateProfile, joinHousehold, leaveHousehold, householdMembers, repairHousehold } = useAuth();
   const [closingDay, setClosingDay] = useState<string>('');
   const [salary, setSalary] = useState<string>('');
   const [inviteCodeInput, setInviteCodeInput] = useState<string>('');
@@ -116,6 +116,21 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
     } catch (error) {
       console.error('Error leaving group:', error);
       toast.error('Erro ao sair do grupo.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRepairHousehold = async () => {
+    setActionLoading(true);
+    try {
+      if (repairHousehold) {
+        await repairHousehold();
+        toast.success('Sincronização do grupo reparada!');
+      }
+    } catch (error) {
+      console.error('Error repairing household:', error);
+      toast.error('Erro ao reparar grupo.');
     } finally {
       setActionLoading(false);
     }
@@ -955,6 +970,23 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                     Sair do Grupo Compartilhado
                   </Button>
                 )}
+              </div>
+
+              {/* Repair tool - Always accessible for troubleshooting */}
+              <div className="pt-2 border-t border-dashed border-neutral-100 dark:border-neutral-800 flex flex-col gap-2">
+                <p className="text-[9px] text-muted-foreground italic px-1 pt-2">
+                  Problemas ao ver outros membros ou erro de sincronia?
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full h-10 rounded-xl font-bold bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 border-blue-500/20" 
+                  onClick={handleRepairHousehold}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+                  Reparar Conexão do Grupo
+                </Button>
               </div>
             </div>
           </div>

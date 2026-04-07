@@ -27,6 +27,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   joinHousehold: (inviteCode: string) => Promise<void>;
   leaveHousehold: () => Promise<void>;
+  repairHousehold: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
 }
 
@@ -111,10 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                     setUserProfile({ ...userData, inviteCode });
                   } else {
-                    // Household deleted or inaccessible, fallback to personal
-                    if (userData.personalHouseholdId && userData.householdId !== userData.personalHouseholdId) {
-                      await safeSetDoc(userRef, { householdId: userData.personalHouseholdId }, { merge: true });
-                    }
+                    // Household document missing but we have an ID? 
+                    // DON'T fallback automatically to personal anymore, 
+                    // as it overwrites the shared link in the DB.
                     setUserProfile(userData);
                   }
                 });
@@ -269,6 +269,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const repairHousehold = async () => {
+    if (!user || !userProfile?.householdId) return;
+    const householdId = userProfile.householdId;
+    
+    try {
+      // 1. Find all users that have this householdId
+      const q = query(collection(db, 'users'), where('householdId', '==', householdId));
+      const uSnap = await getDocs(q);
+      const memberUids = uSnap.docs.map(d => d.id);
+      
+      if (memberUids.length > 0) {
+        // 2. Update the household document with the correct member list
+        await safeSetDoc(doc(db, 'households', householdId), {
+          members: memberUids,
+          id: householdId // ensure ID is set
+        }, { merge: true });
+        
+        console.log(`✅ Repaired household ${householdId} with ${memberUids.length} members`);
+      }
+    } catch (error) {
+      console.error('Error repairing household:', error);
+      throw error;
+    }
+  };
+
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
@@ -280,7 +305,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, householdMembers, loading, signInWithGoogle, logout, joinHousehold, leaveHousehold, updateProfile }}>
+    <AuthContext.Provider value={{ 
+      user, userProfile, householdMembers, loading, 
+      signInWithGoogle, logout, joinHousehold, leaveHousehold, 
+      repairHousehold, updateProfile 
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   );
