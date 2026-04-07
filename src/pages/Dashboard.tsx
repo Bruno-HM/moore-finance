@@ -45,17 +45,18 @@ export default function Dashboard() {
     }
   };
 
-  const [showWithPending, setShowWithPending] = useState(true);
+  const [expenseFilter, setExpenseFilter] = useState<'todos' | 'pago' | 'pendente'>('todos');
 
-  const { totalIncome, totalExpenses, totalPending, expensesByCategoryPaid, expensesByCategoryAll, monthlyExpensesList } = useMemo(() => {
+  const { totalIncome, totalExpenses, totalPending, expensesByCategoryPaid, expensesByCategoryPending, expensesByCategoryAll, monthlyExpensesList } = useMemo(() => {
     let income = 0;
     let expenses = 0;
     let pending = 0;
     const categoryTotalsPaid: Record<string, number> = {};
+    const categoryTotalsPending: Record<string, number> = {};
     const categoryTotalsAll: Record<string, number> = {};
     const list: any[] = [];
 
-    if (!transactions) return { totalIncome: 0, totalExpenses: 0, totalPending: 0, expensesByCategoryPaid: [], expensesByCategoryAll: [], monthlyExpensesList: [] };
+    if (!transactions) return { totalIncome: 0, totalExpenses: 0, totalPending: 0, expensesByCategoryPaid: [], expensesByCategoryPending: [], expensesByCategoryAll: [], monthlyExpensesList: [] };
 
     transactions.forEach(t => {
       try {
@@ -86,6 +87,7 @@ export default function Dashboard() {
               categoryTotalsPaid[t.categoryId] = (categoryTotalsPaid[t.categoryId] || 0) + amount;
             } else {
               pending += amount;
+              categoryTotalsPending[t.categoryId] = (categoryTotalsPending[t.categoryId] || 0) + amount;
             }
           }
         }
@@ -105,13 +107,21 @@ export default function Dashboard() {
       totalExpenses: expenses,
       totalPending: pending,
       expensesByCategoryPaid: mapCategories(categoryTotalsPaid),
+      expensesByCategoryPending: mapCategories(categoryTotalsPending),
       expensesByCategoryAll: mapCategories(categoryTotalsAll),
       monthlyExpensesList: list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     };
   }, [transactions, categories, selectedMonth]);
 
-  const displayedTotal = showWithPending ? totalExpenses + totalPending : totalExpenses;
-  const displayedCategories = showWithPending ? expensesByCategoryAll : expensesByCategoryPaid;
+  const displayedTotal = 
+    expenseFilter === 'todos' ? totalExpenses + totalPending :
+    expenseFilter === 'pago' ? totalExpenses : 
+    totalPending;
+
+  const displayedCategories = 
+    expenseFilter === 'todos' ? expensesByCategoryAll :
+    expenseFilter === 'pago' ? expensesByCategoryPaid :
+    expensesByCategoryPending;
 
   // Real Money = Sum of all bank accounts
   const totalEquity = (bankAccounts || []).reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
@@ -285,12 +295,15 @@ export default function Dashboard() {
       const matchesCategory = t.categoryId === selectedCategory.id;
 
       // Mirror the filtering logic from the summary
-      if (showWithPending) {
+      if (expenseFilter === 'todos') {
         return matchesMonth && matchesCategory;
       }
-      return matchesMonth && matchesCategory && t.status === 'pago';
+      if (expenseFilter === 'pago') {
+        return matchesMonth && matchesCategory && t.status === 'pago';
+      }
+      return matchesMonth && matchesCategory && t.status !== 'pago';
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedCategory, selectedMonth, showWithPending]);
+  }, [transactions, selectedCategory, selectedMonth, expenseFilter]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-12">
@@ -326,23 +339,39 @@ export default function Dashboard() {
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Total Despesas</span>
             </div>
-            <button
-              onClick={() => setShowWithPending(!showWithPending)}
-              className="flex items-center gap-1 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-all border border-white/5"
-            >
-              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${showWithPending ? 'text-amber-400' : 'text-white/20'}`}>Todos</span>
-              <span className="text-[8px] font-black text-white/10">/</span>
-              <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${!showWithPending ? 'text-white' : 'text-white/20'}`}>Pagos</span>
-            </button>
+            <div className="flex items-center gap-1 px-1.5 py-1 rounded-full bg-white/5 border border-white/5">
+              <button
+                onClick={() => setExpenseFilter('todos')}
+                className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${expenseFilter === 'todos' ? 'bg-amber-400 text-black' : 'text-white/20 hover:text-white/40'}`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setExpenseFilter('pago')}
+                className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${expenseFilter === 'pago' ? 'bg-white text-black' : 'text-white/20 hover:text-white/40'}`}
+              >
+                Pagos
+              </button>
+              <button
+                onClick={() => setExpenseFilter('pendente')}
+                className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${expenseFilter === 'pendente' ? 'bg-rose-500 text-white' : 'text-white/20 hover:text-white/40'}`}
+              >
+                Pendentes
+              </button>
+            </div>
           </div>
 
           <div className="mb-10">
-            <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${showWithPending ? 'text-amber-400' : 'text-rose-400'}`}>
+            <div className={`text-6xl font-black leading-none mb-3 tracking-tighter transition-colors ${
+              expenseFilter === 'todos' ? 'text-amber-400' : 
+              expenseFilter === 'pago' ? 'text-rose-400' : 
+              'text-rose-500'
+            }`}>
               {formatParts(displayedTotal)[0]}<span className="text-2xl opacity-40">,{formatParts(displayedTotal)[1]}</span>
             </div>
             <div className="flex items-center gap-4">
               <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{displayedCategories.length} categorias ativas</p>
-              {!showWithPending && totalPending > 0 && (
+              {expenseFilter === 'pago' && totalPending > 0 && (
                 <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 uppercase tracking-widest">
                   + {formatCurrency(totalPending)} pendente
                 </span>
