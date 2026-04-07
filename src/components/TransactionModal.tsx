@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseISO } from 'date-fns';
 
@@ -70,6 +70,16 @@ export default function TransactionModal({
     }
   }, [editingTransaction, initialType, isOpen, mode]);
 
+  // Reset category if it doesn't match the current type
+  useEffect(() => {
+    if (categoryId && !editingTransaction) {
+      const currentCategory = categories.find(c => c.id === categoryId);
+      if (currentCategory && currentCategory.type !== 'ambos' && currentCategory.type !== type) {
+        setCategoryId('');
+      }
+    }
+  }, [type, categoryId, categories, editingTransaction]);
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -122,10 +132,10 @@ export default function TransactionModal({
 
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, payload as any);
-        toast.success('Registro atualizado!');
+        toast.success(mode === 'recurring' ? 'Automação atualizada!' : 'Registro atualizado!');
       } else {
         await addTransaction(payload as any);
-        toast.success('Novo registro salvo!');
+        toast.success(mode === 'recurring' ? 'Nova assinatura/fixo configurado!' : 'Novo registro salvo!');
       }
       onOpenChange(false);
       resetForm();
@@ -172,12 +182,80 @@ export default function TransactionModal({
     dinheiro: 'Dinheiro'
   };
 
+  const renderRecurrenceSection = () => (
+    !editingTransaction && (paymentMethod === 'credito' || mode === 'recurring') && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white/[0.02] p-6 rounded-3xl border border-white/5">
+        <div className="space-y-3">
+          <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Repetição</Label>
+          <Select value={recurrenceType} onValueChange={(v: any) => setRecurrenceType(v)}>
+            <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
+              <SelectValue placeholder="Recorrência">
+                {recurrenceType === 'unica' ? 'Único' : 
+                 recurrenceType === 'parcelada' ? 'Parcelado' :
+                 recurrenceType === 'fixa' ? 'Fixo (Mensal)' :
+                 recurrenceType === 'assinatura' ? 'Assinatura' : undefined}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
+              {mode === 'normal' ? (
+                <>
+                  <SelectItem value="unica">Único</SelectItem>
+                  {paymentMethod === 'credito' && (
+                    <SelectItem value="parcelada">Parcelado</SelectItem>
+                  )}
+                </>
+              ) : (
+                <>
+                  <SelectItem value="fixa">Fixo (Mensal)</SelectItem>
+                  <SelectItem value="assinatura">Assinatura</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {recurrenceType === 'parcelada' && paymentMethod === 'credito' && (
+          <div className="space-y-3">
+            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Nº de Parcelas</Label>
+            <div className="relative">
+              <Input
+                type="number" min="1" max="99"
+                value={totalInstallments} onChange={e => setTotalInstallments(e.target.value)}
+                className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl text-white"
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-right">
+                <p className="text-[8px] font-black uppercase tracking-widest text-primary">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((parseFloat(amount) || 0) / (parseInt(totalInstallments) || 1))}
+                </p>
+                <p className="text-[7px] font-bold text-white/20 uppercase tracking-tighter">por parcela</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(recurrenceType === 'fixa' || recurrenceType === 'assinatura') && (
+          <div className="space-y-3">
+            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Dia de Cobrança</Label>
+            <Input
+              type="number" min="1" max="31"
+              value={billingDay} onChange={e => setBillingDay(e.target.value)}
+              className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl text-white"
+            />
+          </div>
+        )}
+      </div>
+    )
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] bg-black/90 backdrop-blur-2xl border-white/5 p-0 overflow-hidden rounded-[2.5rem] shadow-2xl">
         <DialogHeader className="p-8 pb-4 border-b border-white/5">
-          <DialogTitle className="text-2xl font-black text-white tracking-tighter">
-            {editingTransaction ? 'Editar Registro' : 'Novo Lançamento'}
+          <DialogTitle className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
+            {mode === 'recurring' && <RefreshCw className="w-6 h-6 text-primary" />}
+            {editingTransaction 
+              ? (mode === 'recurring' ? 'Editar Assinatura/Fixo' : 'Editar Registro') 
+              : (mode === 'recurring' ? 'Nova Assinatura ou Fixo' : 'Novo Lançamento')}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
@@ -217,13 +295,16 @@ export default function TransactionModal({
               </div>
             </div>
 
+            {/* Recurrence Selection - PLACEMENT VARIES BY MODE */}
+            {mode === 'recurring' && renderRecurrenceSection()}
+
             {/* Main Info */}
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Título</Label>
                 <Input
                   value={title} onChange={e => setTitle(e.target.value)}
-                  placeholder="Ex: Aluguel, Supermercado..."
+                  placeholder={mode === 'recurring' ? "Ex: Aluguel, Netflix, Seguro..." : "Ex: Supermercado, Almoço..."}
                   className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-lg focus-visible:ring-primary/20 text-white"
                 />
               </div>
@@ -242,7 +323,9 @@ export default function TransactionModal({
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Categoria</Label>
                   <Select value={categoryId} onValueChange={setCategoryId}>
                     <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                      <SelectValue placeholder="Categoria" />
+                      <SelectValue placeholder="Categoria">
+                        {categories.find(c => c.id === categoryId)?.name}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                       {categories.filter(c => c.type === 'ambos' || c.type === type).map(c => (
@@ -252,7 +335,7 @@ export default function TransactionModal({
                   </Select>
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Data</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Data {mode === 'recurring' && '(Início)'}</Label>
                   <input
                     type="date" value={date} onChange={e => setDate(e.target.value)}
                     className="h-14 w-full px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white outline-none"
@@ -268,12 +351,17 @@ export default function TransactionModal({
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Forma de Pagamento</Label>
                   <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
                     <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                      <SelectValue placeholder="Selecione a forma" />
+                      <SelectValue placeholder="Selecione a forma">
+                        {paymentMethod === 'pix' ? 'PIX' : 
+                         paymentMethod === 'credito' ? 'Cartão de Crédito' :
+                         paymentMethod === 'debito' ? 'Cartão de Débito' :
+                         paymentMethod === 'dinheiro' ? 'Dinheiro' : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
-                      <SelectItem value="pix">P-I-X</SelectItem>
-                      <SelectItem value="credito">C. de Crédito</SelectItem>
-                      <SelectItem value="debito">C. de Débito</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="credito">Cartão de Crédito</SelectItem>
+                      <SelectItem value="debito">Cartão de Débito</SelectItem>
                       <SelectItem value="dinheiro">Dinheiro</SelectItem>
                     </SelectContent>
                   </Select>
@@ -284,7 +372,9 @@ export default function TransactionModal({
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Qual Cartão?</Label>
                     <Select value={creditCardId} onValueChange={setCreditCardId}>
                       <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                        <SelectValue placeholder="Selecione o cartão" />
+                        <SelectValue placeholder="Selecione o cartão">
+                          {selectedCreditCardName}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                         {creditCards.filter(cc => cc.isActive !== false).map(cc => (
@@ -298,7 +388,9 @@ export default function TransactionModal({
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Qual Conta?</Label>
                     <Select value={bankAccountId} onValueChange={setBankAccountId}>
                       <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                        <SelectValue placeholder="Selecione a conta" />
+                        <SelectValue placeholder="Selecione a conta">
+                          {selectedBankAccountName}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                         {bankAccounts.filter(acc => acc.isActive !== false).map(acc => (
@@ -311,64 +403,8 @@ export default function TransactionModal({
               </div>
             </div>
 
-            {/* Recurrence Selection */}
-            {!editingTransaction && (paymentMethod === 'credito' || (mode === 'recurring' && (paymentMethod !== 'pix' && paymentMethod !== 'debito' && paymentMethod !== 'dinheiro'))) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white/[0.02] p-6 rounded-3xl border border-white/5">
-                <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Repetição</Label>
-                  <Select value={recurrenceType} onValueChange={(v: any) => setRecurrenceType(v)}>
-                    <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                      <SelectValue placeholder="Recorrência" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
-                      {mode === 'normal' ? (
-                        <>
-                          <SelectItem value="unica">Lançamento Único</SelectItem>
-                          {paymentMethod === 'credito' && (
-                            <SelectItem value="parcelada">Parcelado</SelectItem>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <SelectItem value="fixa">Lançamento Fixo (Mensal)</SelectItem>
-                          <SelectItem value="assinatura">Assinatura</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {recurrenceType === 'parcelada' && paymentMethod === 'credito' && (
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Nº de Parcelas</Label>
-                    <div className="relative">
-                      <Input
-                        type="number" min="1" max="99"
-                        value={totalInstallments} onChange={e => setTotalInstallments(e.target.value)}
-                        className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl text-white"
-                      />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-right">
-                        <p className="text-[8px] font-black uppercase tracking-widest text-primary">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((parseFloat(amount) || 0) / (parseInt(totalInstallments) || 1))}
-                        </p>
-                        <p className="text-[7px] font-bold text-white/20 uppercase tracking-tighter">por parcela</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {(recurrenceType === 'fixa' || recurrenceType === 'assinatura') && (
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Dia de Cobrança</Label>
-                    <Input
-                      type="number" min="1" max="31"
-                      value={billingDay} onChange={e => setBillingDay(e.target.value)}
-                      className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl text-white"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Normal Recurrence Selection */}
+            {mode === 'normal' && renderRecurrenceSection()}
 
           </div>
 
@@ -387,14 +423,22 @@ export default function TransactionModal({
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg shadow-xl shadow-primary/20"
+              className={`flex-1 h-14 rounded-2xl font-black text-lg shadow-xl transition-all ${
+                mode === 'recurring' 
+                  ? 'bg-white text-black hover:bg-white/90 shadow-white/10' 
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20'
+              }`}
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Salvando...
                 </>
-              ) : (editingTransaction ? 'Salvar Alterações' : 'Confirmar Lançamento')}
+               ) : (
+                editingTransaction 
+                  ? (mode === 'recurring' ? 'Salvar Alterações' : 'Salvar Alterações') 
+                  : (mode === 'recurring' ? 'Ativar Automação' : 'Confirmar Lançamento')
+              )}
             </Button>
           </DialogFooter>
         </form>

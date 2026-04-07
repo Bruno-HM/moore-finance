@@ -124,7 +124,7 @@ export default function RecurringTransactions() {
                  <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-white/30">
                     <div className="flex items-center gap-1">
                        <CreditCard className="w-3 h-3" />
-                       {rt.paymentMethod}
+                       <span className="capitalize">{rt.paymentMethod === 'pix' ? 'PIX' : rt.paymentMethod}</span>
                     </div>
                     {rt.billingDay && (
                       <div className="flex items-center gap-1">

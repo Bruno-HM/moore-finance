@@ -512,7 +512,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                         <Label className="text-[10px] uppercase font-black text-primary/60">Dono</Label>
                         <Select value={newAccMemberId} onValueChange={setNewAccMemberId}>
                           <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
-                            <SelectValue placeholder="Selecione" />
+                            <SelectValue placeholder="Selecione">
+                              {getMemberName(newAccMemberId)}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {householdMembers?.map(member => (
@@ -585,7 +587,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                 <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Dono</Label>
                                 <Select value={editAccMemberId} onValueChange={setEditAccMemberId}>
                                   <SelectTrigger className="h-10 rounded-xl bg-neutral-800">
-                                    <SelectValue placeholder="Selecione o dono" />
+                                    <SelectValue placeholder="Selecione o dono">
+                                      {getMemberName(editAccMemberId)}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     {householdMembers?.map(member => (
@@ -636,7 +640,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Conta p/ Pagamento</Label>
                       <Select value={newCardBankId} onValueChange={setNewCardBankId}>
                         <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
-                          <SelectValue placeholder="Selecione a conta..." />
+                          <SelectValue placeholder="Selecione a conta...">
+                            {getBankName(newCardBankId)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {bankAccounts.map(acc => (
@@ -649,7 +655,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Dono do Cartão</Label>
                       <Select value={newCardMemberId} onValueChange={setNewCardMemberId}>
                         <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
-                          <SelectValue placeholder="Selecione o dono..." />
+                          <SelectValue placeholder="Selecione o dono...">
+                            {getMemberName(newCardMemberId)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {householdMembers?.map(member => (
@@ -757,7 +765,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Banco Vinculado</Label>
                                   <Select value={cc.bankAccountId} onValueChange={(val) => handleUpdateCardBank(cc.id, val)}>
                                     <SelectTrigger className="h-10 rounded-xl bg-neutral-800 border-neutral-700 text-xs">
-                                      <SelectValue placeholder="Selecione o banco" />
+                                      <SelectValue placeholder="Selecione o banco">
+                                        {getBankName(cc.bankAccountId)}
+                                      </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
                                       {bankAccounts.map(acc => (
@@ -770,7 +780,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Dono</Label>
                                   <Select value={cc.memberId} onValueChange={(val) => handleUpdateCardMember(cc.id, val)}>
                                     <SelectTrigger className="h-10 rounded-xl bg-neutral-800 border-neutral-700 text-xs">
-                                      <SelectValue placeholder="Selecione o dono" />
+                                      <SelectValue placeholder="Selecione o dono">
+                                        {getMemberName(cc.memberId)}
+                                      </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
                                       {householdMembers?.map(member => (
@@ -853,7 +865,9 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                         <Label className="text-[10px] uppercase font-black text-primary/60">Tipo</Label>
                         <Select value={newCatType} onValueChange={(val: any) => setNewCatType(val)}>
                           <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
-                            <SelectValue />
+                            <SelectValue>
+                              {newCatType === 'despesa' ? 'Despesa' : newCatType === 'receita' ? 'Receita' : 'Ambos'}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="despesa">Despesa</SelectItem>

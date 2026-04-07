@@ -110,7 +110,9 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={(v: any) => setType(v)}>
                   <SelectTrigger className="bg-neutral-950 border-neutral-800">
-                    <SelectValue />
+                    <SelectValue>
+                      {type === 'ambos' ? 'Ambos' : type === 'receita' ? 'Receita' : 'Despesa'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="despesa">Despesa</SelectItem>
@@ -167,7 +169,7 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
                     <div>
                       <p className="text-sm font-medium">{category.name}</p>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                        {category.type === 'ambos' ? 'Receita e Despesa' : category.type}
+                        {category.type === 'ambos' ? 'Receita e Despesa' : category.type === 'receita' ? 'Receita' : 'Despesa'}
                       </p>
                     </div>
                   </div>

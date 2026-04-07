@@ -100,7 +100,9 @@ export default function ImportModal({ trigger }: ImportModalProps) {
             </div>
             <Select value={selectedBankAccountId} onValueChange={setSelectedBankAccountId}>
               <SelectTrigger className="h-14 px-6 rounded-2xl border-none bg-neutral-900 font-bold text-lg focus:ring-primary shadow-inner transition-all text-white">
-                <SelectValue placeholder="Selecione para qual conta importar..." />
+                <SelectValue placeholder="Selecione para qual conta importar...">
+                  {bankAccounts.find(acc => acc.id === selectedBankAccountId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-neutral-800 shadow-2xl bg-neutral-900 border text-white">
                 {bankAccounts.filter(acc => acc.isActive !== false).map(acc => (
