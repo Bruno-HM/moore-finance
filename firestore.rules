@@ -40,7 +40,7 @@ service cloud.firestore {
 
     match /households/{householdId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated() && request.auth.uid in resource.data.members; 
+      allow list: if isAuthenticated() && (request.auth.uid in resource.data.members || resource.data.members.size() < 2); 
       allow create: if isAuthenticated() && 
                     request.resource.data.members is list &&
                     request.resource.data.members.size() == 1 &&

@@ -224,8 +224,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Você já é um membro desta conta.');
           }
           
+          // Update household members
           await safeSetDoc(doc(db, 'households', householdId), {
-            members: [...data.members, user.uid]
+            members: [...data.members, user.uid],
+            inviteCode: data.inviteCode // Sending code back can help certain rule configurations
           }, { merge: true });
           
           const userRef = doc(db, 'users', user.uid);
