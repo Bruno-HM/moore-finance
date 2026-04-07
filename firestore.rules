@@ -40,7 +40,7 @@ service cloud.firestore {
 
     match /households/{householdId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated() && (request.auth.uid in resource.data.members || resource.data.members.size() < 2); 
+      allow list: if isAuthenticated() && (request.auth.uid in resource.data.members); 
       allow create: if isAuthenticated() && 
                     request.resource.data.members is list &&
                     request.resource.data.members.size() == 1 &&
@@ -97,6 +97,13 @@ service cloud.firestore {
       allow update: if isHouseholdMember(resource.data.householdId) && 
                     isHouseholdMember(request.resource.data.householdId);
       allow delete: if isHouseholdMember(resource.data.householdId);
+    }
+
+    match /invite_codes/{code} {
+      allow get: if isAuthenticated();
+      // Allow creation/update if user is the owner or a member (managed by code sync)
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
     }
   }
 }

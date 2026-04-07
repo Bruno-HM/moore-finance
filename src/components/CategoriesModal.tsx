@@ -76,7 +76,7 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger>{trigger}</DialogTrigger>}
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col bg-neutral-950 border-neutral-800">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary" />
@@ -86,7 +86,7 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
 
         <div className="flex-1 overflow-y-auto pr-2 space-y-6 py-4">
           {/* Form Section */}
-          <form onSubmit={handleSubmit} className="bg-neutral-50 dark:bg-neutral-900 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-4">
+          <form onSubmit={handleSubmit} className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-4">
             <h3 className="text-sm font-semibold flex items-center justify-between">
               {isEditing ? 'Editar Categoria' : 'Nova Categoria'}
               {isEditing && (
@@ -103,13 +103,13 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
                   value={name} 
                   onChange={e => setName(e.target.value)} 
                   placeholder="Ex: Alimentação" 
-                  className="bg-white dark:bg-neutral-950"
+                  className="bg-neutral-950 border-neutral-800"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={(v: any) => setType(v)}>
-                  <SelectTrigger className="bg-white dark:bg-neutral-950">
+                  <SelectTrigger className="bg-neutral-950 border-neutral-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -157,7 +157,7 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
               {categories.map(category => (
                 <div 
                   key={category.id} 
-                  className="flex items-center justify-between p-3 bg-white dark:bg-neutral-950 rounded-lg border border-neutral-200 dark:border-neutral-800 group hover:border-primary/30 transition-colors"
+                  className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg border border-neutral-800 group hover:border-primary/30 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div 

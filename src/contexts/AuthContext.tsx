@@ -71,6 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   createdAt: new Date().toISOString(),
                 });
                 
+                await safeSetDoc(doc(db, 'invite_codes', inviteCode), { 
+                  householdId: personalId 
+                });
+                
                 await safeSetDoc(userRef, { 
                   personalHouseholdId: personalId,
                   householdId: userData.householdId || personalId 
@@ -100,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const hData = hSnap.data();
                     let inviteCode = hData.inviteCode;
 
-                    // Auto-repair: Generate inviteCode if missing (legacy data)
                     if (!inviteCode) {
                       inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                       try {
@@ -108,6 +111,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                       } catch (err) {
                         console.error('Error auto-repairing invite code:', err);
                       }
+                    }
+
+                    // Auto-migration: Ensure the secure invite index exists for the current code
+                    if (inviteCode) {
+                      safeSetDoc(doc(db, 'invite_codes', inviteCode), { 
+                        householdId: currentHouseholdId! 
+                      }, { merge: true }).catch(err => {
+                        console.error('Error syncing invite index:', err);
+                      });
                     }
 
                     setUserProfile({ ...userData, inviteCode });
@@ -157,6 +169,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 ownerId: firebaseUser.uid,
                 createdAt: new Date().toISOString(),
               });
+
+              await safeSetDoc(doc(db, 'invite_codes', inviteCode), { 
+                householdId: personalId 
+              });
+
               // Then create profile
               await safeSetDoc(userRef, newProfile);
             } catch (err) {
@@ -208,41 +225,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const joinHousehold = async (inviteCode: string) => {
     if (!user) return;
-    const householdsRef = collection(db, 'households');
-    const q = query(householdsRef, where('inviteCode', '==', inviteCode.toUpperCase()));
+    const normalizedCode = inviteCode.trim().toUpperCase();
     
     try {
-      const querySnapshot = await getDocs(q);
+      // 1. Search directly in the index (no collection query needed)
+      const inviteRef = doc(db, 'invite_codes', normalizedCode);
+      const inviteSnap = await getDoc(inviteRef);
       
-      if (!querySnapshot.empty) {
-        const householdDoc = querySnapshot.docs[0];
-        const householdId = householdDoc.id;
-        const data = householdDoc.data();
+      if (inviteSnap.exists()) {
+        const { householdId } = inviteSnap.data();
         
-        if (data.members.length < 2) {
-          if (data.members.includes(user.uid)) {
-            throw new Error('Você já é um membro desta conta.');
+        // 2. Fetch the household data directly
+        const hSnap = await getDoc(doc(db, 'households', householdId));
+        
+        if (hSnap.exists()) {
+          const data = hSnap.data();
+          
+          if (data.members.length < 2) {
+            if (data.members.includes(user.uid)) {
+              throw new Error('Você já é um membro desta conta.');
+            }
+            
+            // 3. Update household members
+            await safeSetDoc(doc(db, 'households', householdId), {
+              members: [...data.members, user.uid],
+              inviteCode: data.inviteCode 
+            }, { merge: true });
+            
+            const userRef = doc(db, 'users', user.uid);
+            await safeSetDoc(userRef, { householdId }, { merge: true });
+          } else {
+            throw new Error('Esta conta já atingiu o limite de 2 membros.');
           }
-          
-          // Update household members
-          await safeSetDoc(doc(db, 'households', householdId), {
-            members: [...data.members, user.uid],
-            inviteCode: data.inviteCode // Sending code back can help certain rule configurations
-          }, { merge: true });
-          
-          const userRef = doc(db, 'users', user.uid);
-          await safeSetDoc(userRef, { householdId }, { merge: true });
         } else {
-          throw new Error('Esta conta já atingiu o limite de 2 membros.');
+          throw new Error('Erro ao localizar os dados do grupo.');
         }
       } else {
         throw new Error('Código de convite inválido.');
       }
     } catch (error) {
-      if (error instanceof Error && (error.message.includes('inválido') || error.message.includes('limite') || error.message.includes('membro'))) {
+      if (error instanceof Error && (error.message.includes('inválido') || error.message.includes('limite') || error.message.includes('membro') || error.message.includes('Erro ao localizar'))) {
         throw error;
       }
-      handleFirestoreError(error, OperationType.WRITE, `households/join`);
+      handleFirestoreError(error, OperationType.WRITE, `invite_codes/${normalizedCode}`);
     }
   };
 
@@ -276,19 +301,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const householdId = userProfile.householdId;
     
     try {
-      // 1. Find all users that have this householdId
+      // 1. Get current household data to find invite code
+      const hSnap = await getDoc(doc(db, 'households', householdId));
+      if (!hSnap.exists()) return;
+      const hData = hSnap.data();
+      
+      // 2. Find all users that have this householdId
       const q = query(collection(db, 'users'), where('householdId', '==', householdId));
       const uSnap = await getDocs(q);
       const memberUids = uSnap.docs.map(d => d.id);
       
       if (memberUids.length > 0) {
-        // 2. Update the household document with the correct member list
+        // 3. Update the household document with the correct member list
         await safeSetDoc(doc(db, 'households', householdId), {
           members: memberUids,
-          id: householdId // ensure ID is set
+          id: householdId 
         }, { merge: true });
+
+        // 4. Update the invite search index
+        if (hData.inviteCode) {
+          await safeSetDoc(doc(db, 'invite_codes', hData.inviteCode), {
+            householdId: householdId
+          });
+        }
         
-        console.log(`✅ Repaired household ${householdId} with ${memberUids.length} members`);
+        console.log(`✅ Repaired household ${householdId} with ${memberUids.length} members and updated index.`);
       }
     } catch (error) {
       console.error('Error repairing household:', error);

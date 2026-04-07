@@ -89,10 +89,12 @@
     }
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/30;
+    background-color: var(--background);
     }
   html {
     @apply font-sans;
     color-scheme: dark;
+    background-color: var(--background);
     }
 }
 

@@ -430,7 +430,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px] max-h-[90vh] overflow-y-auto p-0 border-none bg-transparent shadow-none">
-        <div className="bg-white dark:bg-neutral-950 rounded-[2rem] overflow-hidden flex flex-col h-full border dark:border-neutral-800 shadow-2xl">
+        <div className="bg-neutral-950 rounded-[2rem] overflow-hidden flex flex-col h-full border border-neutral-800 shadow-2xl">
           <DialogHeader className="px-6 pt-8 pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <Settings className="w-5 h-5 text-primary" />
@@ -440,7 +440,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
           
           <div className="flex-1 overflow-y-auto px-6 py-2 space-y-8 pb-10">
             {/* Status do Grupo */}
-            <div className="bg-neutral-50 dark:bg-neutral-900/50 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800 space-y-3">
+            <div className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {isSharedGroup ? (
@@ -453,7 +453,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   </span>
                 </div>
                 <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-full ${
-                  isSharedGroup ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-primary/10 text-primary'
+                  isSharedGroup ? 'bg-blue-500/10 text-blue-400' : 'bg-primary/10 text-primary'
                 }`}>
                   Ativo
                 </span>
@@ -467,7 +467,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
 
             {/* Dados Financeiros */}
             <div className="space-y-6">
-              <div className="flex items-center gap-2 border-b pb-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
                 <div className="w-2 h-2 rounded-full bg-primary" />
                 <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Financeiro</h3>
               </div>
@@ -482,7 +482,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                     value={salary}
                     onChange={(e) => setSalary(e.target.value)}
                     placeholder="0,00"
-                    className="pl-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border-neutral-100 dark:border-neutral-800 font-bold"
+                    className="pl-12 h-12 rounded-xl bg-neutral-900 border-neutral-800 font-bold"
                   />
                 </div>
               </div>
@@ -502,17 +502,17 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   <div className="space-y-3 p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in zoom-in-95 duration-200">
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-black text-primary/60">Nome da Conta</Label>
-                      <Input placeholder="Ex: Nubank, Itaú..." value={newAccName} onChange={e => setNewAccName(e.target.value)} className="h-10 rounded-xl" />
+                      <Input placeholder="Ex: Nubank, Itaú..." value={newAccName} onChange={e => setNewAccName(e.target.value)} className="h-10 rounded-xl bg-neutral-900" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-black text-primary/60">Saldo Inicial</Label>
-                        <Input type="number" step="0.01" value={newAccBalance} onChange={e => setNewAccBalance(e.target.value)} placeholder="0,00" className="h-10 rounded-xl" />
+                        <Input type="number" step="0.01" value={newAccBalance} onChange={e => setNewAccBalance(e.target.value)} placeholder="0,00" className="h-10 rounded-xl bg-neutral-900 border-neutral-800" />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-black text-primary/60">Dono</Label>
                         <Select value={newAccMemberId} onValueChange={setNewAccMemberId}>
-                          <SelectTrigger className="h-10 rounded-xl bg-background">
+                          <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
                             <SelectValue placeholder="Selecione">{getMemberName(newAccMemberId)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -530,10 +530,10 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                 <div className="space-y-3">
                   {bankAccounts.length > 0 ? (
                     bankAccounts.map(acc => (
-                      <div key={acc.id} className="group border rounded-2xl overflow-hidden bg-neutral-50 dark:bg-neutral-900/50 hover:border-primary/30 transition-all">
+                      <div key={acc.id} className="group border rounded-2xl overflow-hidden bg-neutral-900/50 border-neutral-800 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 shadow-sm flex items-center justify-center text-primary">
+                            <div className="w-10 h-10 rounded-xl bg-neutral-800 shadow-sm flex items-center justify-center text-primary">
                               <Wallet className="w-5 h-5" />
                             </div>
                             <div>
@@ -571,21 +571,21 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                         </div>
 
                         {editingAccId === acc.id && (
-                          <div className="px-4 pb-4 pt-1 border-t border-neutral-100 dark:border-neutral-800 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                          <div className="px-4 pb-4 pt-1 border-t border-neutral-800 space-y-4 animate-in slide-in-from-top-2 duration-300">
                             <div className="grid grid-cols-2 gap-3 mt-2">
                               <div className="space-y-1.5">
                                 <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Nome</Label>
-                                <Input value={editAccName} onChange={e => setEditAccName(e.target.value)} className="h-10 rounded-xl bg-white dark:bg-neutral-800" />
+                                <Input value={editAccName} onChange={e => setEditAccName(e.target.value)} className="h-10 rounded-xl bg-neutral-800" />
                               </div>
                               <div className="space-y-1.5">
                                 <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Saldo Atual</Label>
-                                <Input type="number" step="0.01" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} className="h-10 rounded-xl bg-white dark:bg-neutral-800 font-bold" />
+                                <Input type="number" step="0.01" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} className="h-10 rounded-xl bg-neutral-800 font-bold" />
                               </div>
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Dono</Label>
                                 <Select value={editAccMemberId} onValueChange={setEditAccMemberId}>
-                                  <SelectTrigger className="h-10 rounded-xl bg-white dark:bg-neutral-800">
+                                  <SelectTrigger className="h-10 rounded-xl bg-neutral-800">
                                     <SelectValue placeholder="Selecione o dono">{getMemberName(editAccMemberId)}</SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
@@ -604,7 +604,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4 bg-neutral-50 dark:bg-neutral-900 rounded-2xl border border-dashed font-medium">Nenhuma conta cadastrada.</p>
+                    <p className="text-xs text-muted-foreground text-center py-4 bg-neutral-900 rounded-2xl border border-dashed font-medium">Nenhuma conta cadastrada.</p>
                   )}
                 </div>
               </div>
@@ -622,21 +622,21 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
 
                 {showAddCard && (
                   <div className="space-y-3 p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in zoom-in-95 duration-200">
-                    <Input placeholder="Nome (Ex: Nubank, Itaú...)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="h-10 rounded-xl" />
+                    <Input placeholder="Nome (Ex: Nubank, Itaú...)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="h-10 rounded-xl bg-neutral-900 border-neutral-800" />
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Dia Fechamento</Label>
-                        <Input type="number" min="1" max="31" value={newCardClosing} onChange={e => setNewCardClosing(e.target.value)} placeholder="Ex: 5" className="h-10 rounded-xl" />
+                        <Input type="number" min="1" max="31" value={newCardClosing} onChange={e => setNewCardClosing(e.target.value)} placeholder="Ex: 5" className="h-10 rounded-xl bg-neutral-900 border-neutral-800" />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Dia Vencimento</Label>
-                        <Input type="number" min="1" max="31" value={newCardDue} onChange={e => setNewCardDue(e.target.value)} placeholder="Ex: 12" className="h-10 rounded-xl" />
+                        <Input type="number" min="1" max="31" value={newCardDue} onChange={e => setNewCardDue(e.target.value)} placeholder="Ex: 12" className="h-10 rounded-xl bg-neutral-900 border-neutral-800" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Conta p/ Pagamento</Label>
                       <Select value={newCardBankId} onValueChange={setNewCardBankId}>
-                        <SelectTrigger className="h-10 rounded-xl bg-background">
+                        <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
                           <SelectValue placeholder="Selecione a conta..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -649,7 +649,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Dono do Cartão</Label>
                       <Select value={newCardMemberId} onValueChange={setNewCardMemberId}>
-                        <SelectTrigger className="h-10 rounded-xl bg-background">
+                        <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
                           <SelectValue placeholder="Selecione o dono...">{getMemberName(newCardMemberId)}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
@@ -666,10 +666,10 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                 <div className="space-y-3">
                   {creditCards.length > 0 ? (
                     creditCards.map(cc => (
-                      <div key={cc.id} className="group border rounded-2xl overflow-hidden bg-neutral-50 dark:bg-neutral-900/50 hover:border-primary/30 transition-all">
+                      <div key={cc.id} className="group border rounded-2xl overflow-hidden bg-neutral-900/50 border-neutral-800 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 shadow-sm flex items-center justify-center text-primary">
+                            <div className="w-10 h-10 rounded-xl bg-neutral-800 shadow-sm flex items-center justify-center text-primary">
                               <CreditCardIcon className="w-5 h-5" />
                             </div>
                             <div>
@@ -706,7 +706,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                         </div>
 
                         {editingCardId === cc.id && (
-                          <div className="px-4 pb-6 pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-6 animate-in slide-in-from-top-2 duration-300">
+                          <div className="px-4 pb-6 pt-2 border-t border-neutral-800 space-y-6 animate-in slide-in-from-top-2 duration-300">
                             {/* Form de Edição */}
                             <div className="space-y-4">
                               <div className="space-y-1.5">
@@ -718,7 +718,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                       handleUpdateCard(cc.id, { name: e.target.value.trim() });
                                     }
                                   }}
-                                  className="h-10 rounded-xl bg-white dark:bg-neutral-800" 
+                                  className="h-10 rounded-xl bg-neutral-800 border-neutral-700" 
                                 />
                               </div>
 
@@ -734,7 +734,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                         handleUpdateCard(cc.id, { closingDay: val });
                                       }
                                     }}
-                                    className="h-10 rounded-xl bg-white dark:bg-neutral-800" 
+                                    className="h-10 rounded-xl bg-neutral-800 border-neutral-700" 
                                   />
                                 </div>
                                 <div className="space-y-1.5">
@@ -748,7 +748,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                         handleUpdateCard(cc.id, { dueDay: val });
                                       }
                                     }}
-                                    className="h-10 rounded-xl bg-white dark:bg-neutral-800" 
+                                    className="h-10 rounded-xl bg-neutral-800 border-neutral-700" 
                                   />
                                 </div>
                               </div>
@@ -757,7 +757,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                 <div className="space-y-1.5">
                                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Banco Vinculado</Label>
                                   <Select value={cc.bankAccountId} onValueChange={(val) => handleUpdateCardBank(cc.id, val)}>
-                                    <SelectTrigger className="h-10 rounded-xl bg-white dark:bg-neutral-800 text-xs">
+                                    <SelectTrigger className="h-10 rounded-xl bg-neutral-800 border-neutral-700 text-xs">
                                       <SelectValue>{getBankName(cc.bankAccountId)}</SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
@@ -770,7 +770,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                 <div className="space-y-1.5">
                                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Dono</Label>
                                   <Select value={cc.memberId} onValueChange={(val) => handleUpdateCardMember(cc.id, val)}>
-                                    <SelectTrigger className="h-10 rounded-xl bg-white dark:bg-neutral-800 text-xs">
+                                    <SelectTrigger className="h-10 rounded-xl bg-neutral-800 border-neutral-700 text-xs">
                                       <SelectValue>{getMemberName(cc.memberId)}</SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
@@ -784,14 +784,14 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                             </div>
 
                             {/* Exceptions */}
-                            <div className="space-y-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                            <div className="space-y-3 pt-4 border-t border-neutral-800">
                               <div className="flex items-center justify-between px-1">
                                 <Label className="text-[10px] uppercase font-black text-muted-foreground">Exceções de Fechamento</Label>
                                 <span className="text-[9px] text-muted-foreground italic tracking-tight">* Altera o mês específico</span>
                               </div>
                               <div className="flex gap-2">
-                                <Input type="month" value={exceptionMonth} onChange={e => setExceptionMonth(e.target.value)} className="h-9 text-xs rounded-lg flex-1" />
-                                <Input type="number" placeholder="Dia" value={exceptionDay} onChange={e => setExceptionDay(e.target.value)} className="h-9 w-14 text-xs rounded-lg text-center" />
+                                <Input type="month" value={exceptionMonth} onChange={e => setExceptionMonth(e.target.value)} className="h-9 text-xs rounded-lg flex-1 bg-neutral-900 border-neutral-800" />
+                                <Input type="number" placeholder="Dia" value={exceptionDay} onChange={e => setExceptionDay(e.target.value)} className="h-9 w-14 text-xs rounded-lg text-center bg-neutral-900 border-neutral-800" />
                                 <Button size="sm" className="h-9 w-9 p-0 rounded-lg" onClick={() => handleAddException(cc.id)} disabled={actionLoading}>
                                   <Plus className="w-4 h-4" />
                                 </Button>
@@ -802,7 +802,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                                   {Object.entries(cc.closingDayExceptions)
                                     .sort((a, b) => b[0].localeCompare(a[0]))
                                     .map(([month, day]) => (
-                                    <div key={month} className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                                    <div key={month} className="flex items-center justify-between bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-800">
                                       <span className="text-[10px] font-black uppercase text-muted-foreground">{month}</span>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[11px] font-black text-primary">Dia {day}</span>
@@ -853,7 +853,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-black text-primary/60">Tipo</Label>
                         <Select value={newCatType} onValueChange={(val: any) => setNewCatType(val)}>
-                          <SelectTrigger className="h-10 rounded-xl bg-background">
+                          <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -870,7 +870,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {categories.map(cat => (
-                    <div key={cat.id} className="relative group p-3 rounded-2xl border border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 hover:border-primary/30 transition-all flex items-center gap-2">
+                    <div key={cat.id} className="relative group p-3 rounded-2xl border border-neutral-800 bg-neutral-900/50 hover:border-primary/30 transition-all flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-bold truncate leading-tight">{cat.name}</p>
@@ -905,7 +905,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   </div>
                   <div className="space-y-2">
                     {householdMembers.map(member => (
-                      <div key={member.uid} className="flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-100 dark:border-neutral-800">
+                      <div key={member.uid} className="flex items-center justify-between p-3 rounded-2xl bg-neutral-900/50 border border-neutral-800">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
                             {member.displayName?.charAt(0).toUpperCase() || 'U'}
@@ -928,7 +928,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                 <div className="space-y-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
                   <Label className="text-xs font-bold text-muted-foreground ml-1">Código de Convite do grupo</Label>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm font-mono bg-neutral-50 dark:bg-neutral-900/50 px-4 py-3 rounded-xl border border-neutral-100 dark:border-neutral-800 select-all truncate">
+                    <code className="flex-1 text-sm font-mono bg-neutral-900/50 px-4 py-3 rounded-xl border border-neutral-800 select-all truncate">
                       {userProfile?.inviteCode || '...'}
                     </code>
                     <Button variant="outline" size="icon" onClick={copyInviteCode} disabled={!userProfile?.inviteCode} className="w-12 h-12 rounded-xl">
@@ -950,7 +950,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                         placeholder="Insira o código do convite..."
                         value={inviteCodeInput}
                         onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
-                        className="h-12 rounded-xl uppercase font-mono"
+                        className="h-12 rounded-xl uppercase font-mono bg-neutral-900 border-neutral-800"
                       />
                       <Button 
                         onClick={handleJoinGroup}
@@ -993,12 +993,12 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-6 border-t bg-neutral-50 dark:bg-neutral-900 shadow-inner flex flex-row items-center justify-between gap-3">
+          <DialogFooter className="px-6 py-6 border-t bg-neutral-900 border-neutral-800 shadow-inner flex flex-row items-center justify-between gap-3">
             <Button 
               variant="ghost" 
               onClick={() => onOpenChange(false)} 
               disabled={loading} 
-              className="flex-1 rounded-2xl font-bold h-12 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              className="flex-1 rounded-2xl font-bold h-12 hover:bg-neutral-800"
             >
               Fechar
             </Button>

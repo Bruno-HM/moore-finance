@@ -80,7 +80,7 @@ export default function ImportModal({ trigger }: ImportModalProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col p-0 border-none rounded-3xl shadow-2xl">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col p-0 border-none rounded-3xl shadow-2xl bg-neutral-950 border-neutral-800">
         <DialogHeader className="p-8 pb-4 bg-primary/5 border-b border-primary/10">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
@@ -99,10 +99,10 @@ export default function ImportModal({ trigger }: ImportModalProps) {
               <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground">Conta de Destino</Label>
             </div>
             <Select value={selectedBankAccountId} onValueChange={setSelectedBankAccountId}>
-              <SelectTrigger className="h-14 px-6 rounded-2xl border-none bg-neutral-100 dark:bg-neutral-800 font-bold text-lg focus:ring-primary shadow-inner transition-all">
+              <SelectTrigger className="h-14 px-6 rounded-2xl border-none bg-neutral-900 font-bold text-lg focus:ring-primary shadow-inner transition-all text-white">
                 <SelectValue placeholder="Selecione para qual conta importar..." />
               </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-2xl">
+              <SelectContent className="rounded-2xl border-neutral-800 shadow-2xl bg-neutral-900 border text-white">
                 {bankAccounts.map(acc => (
                   <SelectItem key={acc.id} value={acc.id} className="h-12 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -125,7 +125,7 @@ export default function ImportModal({ trigger }: ImportModalProps) {
             {!selectedFile ? (
               <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-primary/20 rounded-[2rem] bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer group">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <div className="p-4 rounded-full bg-white dark:bg-neutral-800 shadow-xl mb-4 group-hover:scale-110 transition-transform">
+                  <div className="p-4 rounded-full bg-neutral-800 shadow-xl mb-4 group-hover:scale-110 transition-transform">
                     <FileUp className="w-8 h-8 text-primary" />
                   </div>
                   <p className="text-sm font-black text-primary uppercase tracking-widest">Clique para selecionar</p>
@@ -161,7 +161,7 @@ export default function ImportModal({ trigger }: ImportModalProps) {
           )}
         </div>
 
-        <DialogFooter className="p-8 bg-neutral-50 dark:bg-neutral-900 border-t flex flex-col sm:flex-row gap-3">
+        <DialogFooter className="p-8 bg-neutral-900 border-t border-neutral-800 flex flex-col sm:flex-row gap-3">
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={isProcessing} className="flex-1 font-bold rounded-2xl h-14">Cancelar</Button>
           <Button 
             onClick={handleImport} 
