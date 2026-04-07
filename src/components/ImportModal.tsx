@@ -103,11 +103,11 @@ export default function ImportModal({ trigger }: ImportModalProps) {
                 <SelectValue placeholder="Selecione para qual conta importar..." />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-neutral-800 shadow-2xl bg-neutral-900 border text-white">
-                {bankAccounts.map(acc => (
+                {bankAccounts.filter(acc => acc.isActive !== false).map(acc => (
                   <SelectItem key={acc.id} value={acc.id} className="h-12 rounded-xl">
                     <div className="flex items-center gap-2">
                       <span className="font-bold">{acc.name}</span>
-                      <span className="text-[10px] opacity-50">({householdMembers.find(m => m.uid === acc.memberId)?.displayName || 'Privada'})</span>
+                      <span className="text-[10px] opacity-50">({householdMembers.find(m => m.uid === acc.memberId)?.displayName || 'Geral'})</span>
                     </div>
                   </SelectItem>
                 ))}

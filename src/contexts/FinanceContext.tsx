@@ -40,6 +40,7 @@ export interface CreditCard {
   bankAccountId: string; // Linked bank account for payment
   memberId: string; // The user ID this card belongs to
   closingDayExceptions?: Record<string, number>; // Format: "YYYY-MM": day
+  isActive?: boolean;
 }
 
 export interface RecurringTransaction {
@@ -68,6 +69,7 @@ export interface BankAccount {
   initialBalance: number;
   currentBalance: number;
   memberId: string; // The user ID this account belongs to
+  isActive?: boolean;
 }
 
 export interface Category {

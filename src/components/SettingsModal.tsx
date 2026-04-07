@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2, Building2, Wallet, Tag, RefreshCw } from 'lucide-react';
+import { Settings, Loader2, Copy, Check, Users, User, LogOut, ArrowRight, CreditCard as CreditCardIcon, Plus, Trash2, Building2, Wallet, Tag, RefreshCw, AlertCircle } from 'lucide-react';
 import { useFinance, CreditCard } from '../contexts/FinanceContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -24,6 +24,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const { 
     creditCards, addCreditCard, deleteCreditCard, updateCreditCard,
     bankAccounts, addBankAccount, deleteBankAccount, updateBankAccount,
@@ -105,14 +106,12 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
   };
 
   const handleLeaveGroup = async () => {
-    if (!confirm('Tem certeza que deseja sair deste grupo? Você voltará para o seu grupo pessoal.')) {
-      return;
-    }
-
     setActionLoading(true);
     try {
       await leaveHousehold();
       toast.success('Você voltou para o seu grupo pessoal.');
+      setShowLeaveConfirm(false);
+      onOpenChange(false);
     } catch (error) {
       console.error('Error leaving group:', error);
       toast.error('Erro ao sair do grupo.');
@@ -528,8 +527,8 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                 )}
 
                 <div className="space-y-3">
-                  {bankAccounts.length > 0 ? (
-                    bankAccounts.map(acc => (
+                  {bankAccounts.filter(acc => acc.isActive !== false).length > 0 ? (
+                    bankAccounts.filter(acc => acc.isActive !== false).map(acc => (
                       <div key={acc.id} className="group border rounded-2xl overflow-hidden bg-neutral-900/50 border-neutral-800 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between p-4">
                           <div className="flex items-center gap-3">
@@ -664,8 +663,8 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                 )}
 
                 <div className="space-y-3">
-                  {creditCards.length > 0 ? (
-                    creditCards.map(cc => (
+                  {creditCards.filter(cc => cc.isActive !== false).length > 0 ? (
+                    creditCards.filter(cc => cc.isActive !== false).map(cc => (
                       <div key={cc.id} className="group border rounded-2xl overflow-hidden bg-neutral-900/50 border-neutral-800 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between p-4">
                           <div className="flex items-center gap-3">
@@ -965,7 +964,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   <Button 
                     variant="destructive" 
                     className="w-full h-12 rounded-xl font-bold gap-2 text-sm shadow-lg shadow-rose-500/10" 
-                    onClick={handleLeaveGroup}
+                    onClick={() => setShowLeaveConfirm(true)}
                     disabled={actionLoading}
                   >
                     {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
@@ -973,6 +972,49 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   </Button>
                 )}
               </div>
+
+              {/* Leave Confirmation Dialog */}
+              <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+                <DialogContent className="sm:max-w-[400px] border-none bg-neutral-950 p-0 overflow-hidden rounded-3xl shadow-2xl">
+                  <div className="p-8 space-y-6">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500">
+                        <AlertCircle className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white tracking-tight">Sair do Grupo?</h3>
+                        <p className="text-sm text-white/50 leading-relaxed">
+                          Atenção: Ao sair, seu histórico continuará aqui para não quebrar os cálculos, mas suas contas e cartões ficarão ocultos para novos lançamentos.
+                        </p>
+                        <p className="text-xs text-white/30 font-medium">
+                          Suas contas serão reativadas automaticamente caso você retorne ao grupo futuramente.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-3">
+                      <Button 
+                        variant="destructive" 
+                        size="lg"
+                        className="h-14 rounded-2xl font-black text-base shadow-xl shadow-rose-500/10"
+                        onClick={handleLeaveGroup}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                        Confirmar Saída
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="lg"
+                        className="h-14 rounded-2xl font-bold hover:bg-white/5"
+                        onClick={() => setShowLeaveConfirm(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {/* Repair tool - Always accessible for troubleshooting */}
               <div className="pt-2 border-t border-dashed border-neutral-100 dark:border-neutral-800 flex flex-col gap-2">

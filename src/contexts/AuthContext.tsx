@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { safeSetDoc } from '../lib/firestore-utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -224,45 +224,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const joinHousehold = async (inviteCode: string) => {
-    if (!user) return;
+    if (!user || !userProfile) return;
     const normalizedCode = inviteCode.trim().toUpperCase();
     
     try {
-      // 1. Search directly in the index (no collection query needed)
       const inviteRef = doc(db, 'invite_codes', normalizedCode);
       const inviteSnap = await getDoc(inviteRef);
+      if (!inviteSnap.exists()) throw new Error('Código de convite inválido.');
       
-      if (inviteSnap.exists()) {
-        const { householdId } = inviteSnap.data();
+      const { householdId } = inviteSnap.data();
+      const hRef = doc(db, 'households', householdId);
+      const hSnap = await getDoc(hRef);
+      if (!hSnap.exists()) throw new Error('Erro ao localizar os dados do grupo.');
+      
+      const data = hSnap.data();
+      if (data.members.length >= 2) throw new Error('Esta conta já atingiu o limite de 2 membros.');
+      if (data.members.includes(user.uid)) throw new Error('Você já é um membro desta conta.');
+
+      const batch = writeBatch(db);
+      
+      // Archiving/Reactivation logic
+      let archivedMembers = data.archivedMembers || [];
+      const wasArchived = archivedMembers.includes(user.uid);
+      
+      if (wasArchived) {
+        archivedMembers = archivedMembers.filter((id: string) => id !== user.uid);
         
-        // 2. Fetch the household data directly
-        const hSnap = await getDoc(doc(db, 'households', householdId));
+        // Reactivate assets
+        const [accSnap, cardSnap] = await Promise.all([
+          getDocs(query(collection(db, 'bank_accounts'), where('householdId', '==', householdId), where('memberId', '==', user.uid))),
+          getDocs(query(collection(db, 'credit_cards'), where('householdId', '==', householdId), where('memberId', '==', user.uid)))
+        ]);
         
-        if (hSnap.exists()) {
-          const data = hSnap.data();
-          
-          if (data.members.length < 2) {
-            if (data.members.includes(user.uid)) {
-              throw new Error('Você já é um membro desta conta.');
-            }
-            
-            // 3. Update household members
-            await safeSetDoc(doc(db, 'households', householdId), {
-              members: [...data.members, user.uid],
-              inviteCode: data.inviteCode 
-            }, { merge: true });
-            
-            const userRef = doc(db, 'users', user.uid);
-            await safeSetDoc(userRef, { householdId }, { merge: true });
-          } else {
-            throw new Error('Esta conta já atingiu o limite de 2 membros.');
-          }
-        } else {
-          throw new Error('Erro ao localizar os dados do grupo.');
-        }
-      } else {
-        throw new Error('Código de convite inválido.');
+        accSnap.docs.forEach(d => batch.update(d.ref, { isActive: true }));
+        cardSnap.docs.forEach(d => batch.update(d.ref, { isActive: true }));
       }
+
+      batch.update(hRef, { 
+        members: [...data.members, user.uid],
+        archivedMembers,
+        inviteCode: data.inviteCode 
+      });
+      
+      batch.update(doc(db, 'users', user.uid), { householdId });
+      
+      await batch.commit();
     } catch (error) {
       if (error instanceof Error && (error.message.includes('inválido') || error.message.includes('limite') || error.message.includes('membro') || error.message.includes('Erro ao localizar'))) {
         throw error;
@@ -273,25 +279,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const leaveHousehold = async () => {
     if (!user || !userProfile?.householdId || !userProfile.personalHouseholdId) return;
-    
-    // If already in personal household, do nothing
     if (userProfile.householdId === userProfile.personalHouseholdId) return;
 
     const currentHouseholdId = userProfile.householdId;
-    const householdRef = doc(db, 'households', currentHouseholdId);
+    const hRef = doc(db, 'households', currentHouseholdId);
     
     try {
-      const hSnap = await getDoc(householdRef);
-      if (hSnap.exists()) {
-        const data = hSnap.data();
-        const newMembers = data.members.filter((m: string) => m !== user.uid);
-        
-        await safeSetDoc(householdRef, { members: newMembers }, { merge: true });
-      }
+      const hSnap = await getDoc(hRef);
+      if (!hSnap.exists()) return;
+      const data = hSnap.data();
+
+      const batch = writeBatch(db);
       
-      const userRef = doc(db, 'users', user.uid);
-      await safeSetDoc(userRef, { householdId: userProfile.personalHouseholdId }, { merge: true });
+      // Update Household Membership
+      const newMembers = data.members.filter((m: string) => m !== user.uid);
+      let archivedMembers = data.archivedMembers || [];
+      
+      // Add to archive (max 3 items FIFO)
+      if (!archivedMembers.includes(user.uid)) {
+        archivedMembers.push(user.uid);
+        if (archivedMembers.length > 3) archivedMembers.shift();
+      }
+
+      batch.update(hRef, { 
+        members: newMembers,
+        archivedMembers 
+      });
+
+      // Update User Profile
+      batch.update(doc(db, 'users', user.uid), { householdId: userProfile.personalHouseholdId });
+
+      // Deactivate assets
+      const [accSnap, cardSnap] = await Promise.all([
+        getDocs(query(collection(db, 'bank_accounts'), where('householdId', '==', currentHouseholdId), where('memberId', '==', user.uid))),
+        getDocs(query(collection(db, 'credit_cards'), where('householdId', '==', currentHouseholdId), where('memberId', '==', user.uid)))
+      ]);
+
+      accSnap.docs.forEach(d => batch.update(d.ref, { isActive: false }));
+      cardSnap.docs.forEach(d => batch.update(d.ref, { isActive: false }));
+
+      await batch.commit();
     } catch (error) {
+      console.error('Error leaving household:', error);
       handleFirestoreError(error, OperationType.WRITE, `households/leave`);
     }
   };

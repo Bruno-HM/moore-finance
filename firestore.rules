@@ -27,6 +27,10 @@ service cloud.firestore {
              request.auth.uid in data.members;
     }
 
+    function isAssetOwner(data) {
+      return isAuthenticated() && request.auth.uid == data.memberId;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -84,18 +88,18 @@ service cloud.firestore {
     }
 
     match /credit_cards/{cardId} {
-      allow read: if isHouseholdMember(resource.data.householdId);
+      allow read: if isHouseholdMember(resource.data.householdId) || isAssetOwner(resource.data);
       allow create: if isHouseholdMember(request.resource.data.householdId);
-      allow update: if isHouseholdMember(resource.data.householdId) && 
-                    isHouseholdMember(request.resource.data.householdId);
+      allow update: if (isHouseholdMember(resource.data.householdId) || isAssetOwner(resource.data)) && 
+                    (isHouseholdMember(request.resource.data.householdId) || isAssetOwner(request.resource.data));
       allow delete: if isHouseholdMember(resource.data.householdId);
     }
 
     match /bank_accounts/{accountId} {
-      allow read: if isHouseholdMember(resource.data.householdId);
+      allow read: if isHouseholdMember(resource.data.householdId) || isAssetOwner(resource.data);
       allow create: if isHouseholdMember(request.resource.data.householdId);
-      allow update: if isHouseholdMember(resource.data.householdId) && 
-                    isHouseholdMember(request.resource.data.householdId);
+      allow update: if (isHouseholdMember(resource.data.householdId) || isAssetOwner(resource.data)) && 
+                    (isHouseholdMember(request.resource.data.householdId) || isAssetOwner(request.resource.data));
       allow delete: if isHouseholdMember(resource.data.householdId);
     }
 

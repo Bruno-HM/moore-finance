@@ -287,7 +287,7 @@ export default function TransactionModal({
                         <SelectValue placeholder="Selecione o cartão" />
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
-                        {creditCards.map(cc => (
+                        {creditCards.filter(cc => cc.isActive !== false).map(cc => (
                           <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -301,7 +301,7 @@ export default function TransactionModal({
                         <SelectValue placeholder="Selecione a conta" />
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
-                        {bankAccounts.map(acc => (
+                        {bankAccounts.filter(acc => acc.isActive !== false).map(acc => (
                           <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
                         ))}
                       </SelectContent>
