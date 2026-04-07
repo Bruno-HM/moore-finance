@@ -381,7 +381,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
         const alreadyExists = transactions.some(t => 
           t.recurringId === rt.id && 
-          isSameMonth(parseISO(t.billingDate || t.date), selectedMonth)
+          isSameMonth(parseISO(t.date), selectedMonth)
         );
 
         if (!alreadyExists) {
@@ -856,7 +856,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
           const instance = transactions.find(t => 
             t.recurringId === rt.id && 
-            isSameMonth(parseISO(t.billingDate || t.date), targetMonth)
+            isSameMonth(parseISO(t.date), targetMonth)
           );
 
           if (instance) {
@@ -889,7 +889,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
                 }, { merge: true });
               }
             }
-          } else {
             // Create missing instance
             const id = uuidv4();
             let transactionDate: Date;
@@ -918,6 +917,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
               recurrenceType: rt.recurrenceType,
               recurringId: rt.id
             });
+          }
+
+          // [CLEANUP] Remove existing duplicates for this month if found
+          const monthInstances = transactions.filter(t => 
+            t.recurringId === rt.id && 
+            isSameMonth(parseISO(t.date), targetMonth)
+          );
+          
+          if (monthInstances.length > 1) {
+            const paidOne = monthInstances.find(t => t.status === 'pago');
+            if (paidOne) {
+              for (const t of monthInstances) {
+                if (t.id !== paidOne.id && t.status === 'pendente') {
+                  await deleteDoc(doc(db, 'transactions', t.id)).catch(() => {});
+                }
+              }
+            } else {
+              // Keep only the first one
+              for (let d = 1; d < monthInstances.length; d++) {
+                await deleteDoc(doc(db, 'transactions', monthInstances[d].id)).catch(() => {});
+              }
+            }
           }
         }
       }

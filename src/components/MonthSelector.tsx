@@ -11,7 +11,7 @@ export function MonthSelector() {
   const handleNextMonth = () => setSelectedMonth(addMonths(selectedMonth, 1));
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-2 sm:gap-4 shrink-0">
       <Button variant="outline" size="icon" onClick={handlePrevMonth}>
         <ChevronLeft className="w-4 h-4" />
       </Button>

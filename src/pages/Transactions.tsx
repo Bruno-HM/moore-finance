@@ -100,7 +100,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10 pb-20">
+    <div className="max-w-4xl mx-auto space-y-10">
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
@@ -124,7 +124,7 @@ export default function Transactions() {
           />
         </div>
         
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar pb-1 md:pb-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto pb-1 md:pb-0">
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-11 min-w-[120px] bg-white/5 border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 hover:bg-white/[0.08] transition-all">

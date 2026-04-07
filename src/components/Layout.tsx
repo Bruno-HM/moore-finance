@@ -42,7 +42,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-primary/30">
       {/* Universal Top Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-b border-white/5">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-2 group">
@@ -146,7 +146,7 @@ export default function Layout() {
         )}
       </AnimatePresence>
 
-      <main className="pt-28 pb-10 px-4 sm:px-6">
+      <main className="pt-24 pb-32 px-4 sm:px-6 max-w-7xl mx-auto">
         <Outlet />
       </main>
 

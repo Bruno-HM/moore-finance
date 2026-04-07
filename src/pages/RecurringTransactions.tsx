@@ -113,10 +113,11 @@ export default function RecurringTransactions() {
         {recurringTransactions.map(rt => {
           const category = categories.find(c => c.id === rt.categoryId);
           const creator = householdMembers.find(m => m.uid === rt.createdBy);
-          const instance = transactions.find(t => 
+          const monthInstances = transactions.filter(t => 
             t.recurringId === rt.id && 
-            isSameMonth(parseISO(t.billingDate || t.date), selectedMonth)
+            isSameMonth(parseISO(t.date), selectedMonth)
           );
+          const instance = monthInstances.find(t => t.status === 'pago') || monthInstances[0];
           const isPaid = instance?.status === 'pago';
 
           return (

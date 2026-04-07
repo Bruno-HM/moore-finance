@@ -203,17 +203,39 @@ export default function Dashboard() {
 
   const pendingRecurrent = useMemo(() => {
     if (!transactions) return [];
-    return transactions.filter(t => {
-      try {
-        const dateStr = t.billingDate || t.date;
-        if (!dateStr) return false;
-        const matchesMonth = isSameMonth(parseISO(dateStr), selectedMonth);
-        const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
-        return matchesMonth && isRecurrent && t.status === 'pendente';
-      } catch (e) { return false; }
-    }).sort((a, b) => {
-      const dateA = new Date(a.billingDate || a.date).getTime();
-      const dateB = new Date(b.billingDate || b.date).getTime();
+    // 1. Get all recurring instances for this month (any status)
+    const allRecurrentThisMonth = transactions.filter(t => {
+      const isRecurrent = !!t.recurringId || t.recurrenceType === 'fixa' || t.recurrenceType === 'assinatura';
+      if (!isRecurrent) return false;
+      const dateStr = t.date; // Use Competência (date) for sync
+      return isSameMonth(parseISO(dateStr), selectedMonth);
+    });
+
+    // 2. Identify recurringIds that are already PAID this month
+    const paidRecurringIds = new Set(
+      allRecurrentThisMonth
+        .filter(t => t.status === 'pago' && t.recurringId)
+        .map(t => t.recurringId)
+    );
+
+    // 3. Filter pending instances that DON'T have a paid counterpart
+    const pendingWithNoPaid = allRecurrentThisMonth.filter(t => 
+      t.status === 'pendente' && 
+      (!t.recurringId || !paidRecurringIds.has(t.recurringId))
+    );
+
+    // 4. Deduplicate (just in case there are multiple pendings with no paid)
+    const uniqueMap = new Map<string, Transaction>();
+    pendingWithNoPaid.forEach(t => {
+      const key = t.recurringId || t.id;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, t);
+      }
+    });
+
+    return Array.from(uniqueMap.values()).sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
       return dateA - dateB;
     });
   }, [transactions, selectedMonth]);
@@ -271,14 +293,14 @@ export default function Dashboard() {
   }, [transactions, selectedCategory, selectedMonth, showWithPending]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 pb-20">
+    <div className="max-w-4xl mx-auto space-y-12">
       {/* Header & Month Selector */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
           <h2 className="text-4xl font-black tracking-tighter text-white mb-1">Fluxo de Caixa</h2>
           <p className="text-white/40 text-sm font-medium">Situação financeira e movimentações do período.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <Button
             variant="ghost"
             size="sm"
