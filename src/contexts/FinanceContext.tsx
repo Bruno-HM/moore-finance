@@ -504,6 +504,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
           await safeSetDoc(doc(db, 'transactions', id), {
             ...transaction,
+            amount: transaction.amount / transaction.totalInstallments,
             id,
             householdId,
             createdBy: uid,
@@ -532,7 +533,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         
         // Rules for status enforcement (only 'unica' reaches here)
         let finalStatus = transaction.status;
-        if (transaction.paymentMethod === 'pix' || transaction.paymentMethod === 'dinheiro') {
+        if (transaction.paymentMethod === 'pix' || transaction.paymentMethod === 'dinheiro' || transaction.paymentMethod === 'debito') {
           finalStatus = 'pago';
         }
 

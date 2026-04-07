@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import TransactionModal from '../components/TransactionModal';
 
 export default function RecurringTransactions() {
   const { userProfile, householdMembers } = useAuth();
@@ -21,18 +22,9 @@ export default function RecurringTransactions() {
     recalculateRecurring, updateTransaction, restoreRecurringInstance 
   } = useFinance();
   
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRT, setEditingRT] = useState<RecurringTransaction | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
-
-  // Form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credito' | 'debito' | 'dinheiro'>('dinheiro');
-  const [billingDay, setBillingDay] = useState('');
-  const [updateMode, setUpdateMode] = useState<'este_mes' | 'futuras'>('futuras');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -51,32 +43,17 @@ export default function RecurringTransactions() {
   };
 
   const handleOpenEdit = (rt: RecurringTransaction) => {
-    setEditingRT(rt);
-    setTitle(rt.title || rt.description);
-    setDescription(rt.description || '');
-    setAmount(rt.amount.toString());
-    setCategoryId(rt.categoryId);
-    setPaymentMethod(rt.paymentMethod);
-    setBillingDay(rt.billingDay?.toString() || '');
-    setUpdateMode('futuras');
-    setIsDialogOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingRT) return;
-    try {
-      await updateRecurringTransaction(editingRT.id, {
-        title, description, amount: parseFloat(amount),
-        categoryId, paymentMethod,
-        billingDay: billingDay ? parseInt(billingDay) : undefined
-      }, updateMode);
-      toast.success('Atualizado!');
-      setIsDialogOpen(false);
-    } catch (error) {
-      toast.error('Erro ao atualizar.');
+    // Find one instance to serve as the template for editing in TransactionModal
+    const instance = transactions.find(t => t.recurringId === rt.id);
+    if (instance) {
+      setEditingTransaction(instance);
+      setIsModalOpen(true);
+    } else {
+      toast.error('Não foi possível carregar a instância para edição.');
     }
   };
+
+  // handleSubmit is now handled inside TransactionModal
 
   const handleDelete = async (id: string) => {
     if (confirm('Remover esta assinatura?')) {
@@ -219,52 +196,20 @@ export default function RecurringTransactions() {
         })}
       </div>
 
-      {/* Simplified Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[450px] bg-black/90 backdrop-blur-3xl border-white/5 p-0 overflow-hidden rounded-[2.5rem] shadow-2xl">
-          <DialogHeader className="p-8 pb-4 border-b border-white/5">
-            <DialogTitle className="text-2xl font-black text-white tracking-tighter">Ajustar Assinatura</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="p-8 space-y-8">
-            <div className="space-y-4">
-               <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-1">Título</Label>
-                  <Input value={title} onChange={e => setTitle(e.target.value)} className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-lg" />
-               </div>
-               <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                     <Label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-1">Valor</Label>
-                     <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl" />
-                  </div>
-                  <div className="space-y-3">
-                     <Label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-1">Vencimento</Label>
-                     <Input type="number" min="1" max="31" value={billingDay} onChange={e => setBillingDay(e.target.value)} className="h-14 px-6 rounded-2xl bg-white/5 border-none font-black text-xl text-center" />
-                  </div>
-               </div>
-               <div className="space-y-3 pt-4">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-1">Abrangência da Mudança</Label>
-                  <Select value={updateMode} onValueChange={(v: any) => setUpdateMode(v)}>
-                    <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-xs uppercase tracking-widest text-white/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-black border-white/10">
-                      <SelectItem value="este_mes">Somente este mês</SelectItem>
-                      <SelectItem value="futuras">Este mês e futuros</SelectItem>
-                    </SelectContent>
-                  </Select>
-               </div>
-            </div>
-            <Button type="submit" className="w-full h-16 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:scale-[1.02] active:scale-95 transition-all">
-              Confirmar Ajustes
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <TransactionModal 
+        isOpen={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) setEditingTransaction(null);
+        }}
+        editingTransaction={editingTransaction}
+        mode="recurring"
+      />
 
       {/* FAB - Criar Novo */}
       <div className="fixed bottom-8 right-8 z-50">
         <Button 
-          onClick={() => navigate('/transactions', { state: { openNewRecurring: true } })}
+          onClick={() => setIsModalOpen(true)}
           className="w-14 h-14 rounded-2xl bg-primary text-black shadow-2xl shadow-primary/30 hover:scale-110 active:scale-90 transition-all flex items-center justify-center p-0"
         >
           <Plus className="w-6 h-6" />
