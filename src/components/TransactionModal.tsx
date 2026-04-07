@@ -159,6 +159,21 @@ export default function TransactionModal({
     return categories.find(c => c.id === categoryId)?.name;
   }, [categories, categoryId]);
 
+  const selectedCreditCardName = useMemo(() => {
+    return creditCards.find(cc => cc.id === creditCardId)?.name;
+  }, [creditCards, creditCardId]);
+
+  const selectedBankAccountName = useMemo(() => {
+    return bankAccounts.find(acc => acc.id === bankAccountId)?.name;
+  }, [bankAccounts, bankAccountId]);
+
+  const paymentMethodLabels: Record<string, string> = {
+    pix: 'P-I-X',
+    credito: 'C. de Crédito',
+    debito: 'C. de Débito',
+    dinheiro: 'Dinheiro'
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] bg-black/90 backdrop-blur-2xl border-white/5 p-0 overflow-hidden rounded-[2.5rem] shadow-2xl">
@@ -247,7 +262,9 @@ export default function TransactionModal({
                   <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Forma de Pagamento</Label>
                   <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
                     <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                      <SelectValue placeholder="Selecione" />
+                      <SelectValue placeholder="Selecione">
+                        {paymentMethodLabels[paymentMethod] || "Selecione"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                       <SelectItem value="pix">P-I-X</SelectItem>
@@ -263,7 +280,9 @@ export default function TransactionModal({
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Qual Cartão?</Label>
                     <Select value={creditCardId} onValueChange={setCreditCardId}>
                       <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                        <SelectValue placeholder="Selecione" />
+                        <SelectValue placeholder="Selecione">
+                          {selectedCreditCardName || "Selecione"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                         {creditCards.map(cc => (
@@ -277,7 +296,9 @@ export default function TransactionModal({
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 ml-1">Qual Conta?</Label>
                     <Select value={bankAccountId} onValueChange={setBankAccountId}>
                       <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
-                        <SelectValue placeholder="Selecione" />
+                        <SelectValue placeholder="Selecione">
+                          {selectedBankAccountName || "Selecione"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
                         {bankAccounts.map(acc => (

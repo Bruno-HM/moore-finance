@@ -637,7 +637,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                       <Label className="text-[10px] uppercase font-black text-primary/60 ml-1">Conta p/ Pagamento</Label>
                       <Select value={newCardBankId} onValueChange={setNewCardBankId}>
                         <SelectTrigger className="h-10 rounded-xl bg-neutral-900 border-neutral-800">
-                          <SelectValue placeholder="Selecione a conta..." />
+                          <SelectValue placeholder="Selecione a conta...">{getBankName(newCardBankId)}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {bankAccounts.map(acc => (
