@@ -990,6 +990,41 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                   Reparar Conexão do Grupo
                 </Button>
               </div>
+              {/* Sistema e Versão */}
+              <div className="space-y-4 pt-4 border-t border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Sistema e Versão</h3>
+                </div>
+                
+                <div className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold">MooreFinance v2.0.0</p>
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-black uppercase">Atualizado</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Estabilidade e Melhorias de UI</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="h-8 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-all"
+                    onClick={() => {
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(registrations => {
+                          registrations.forEach(r => r.update());
+                          toast.success('Buscando atualizações...');
+                          setTimeout(() => window.location.reload(), 1500);
+                        });
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                  >
+                    Atualizar
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
