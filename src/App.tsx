@@ -20,6 +20,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <FinanceProvider>{children}</FinanceProvider>;
 }
 
+
+
+/*
+   ><(((º>  ~ Bagre Torto
+   Code flows like water.
+*/
+
+
+
+
+
 export default function App() {
   return (
     <ErrorBoundary>
