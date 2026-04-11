@@ -35,3 +35,4 @@ export const AlgorithmicBackground = ({ mouseX, mouseY }: { mouseX: any; mouseY:
     </div>
   );
 };
+

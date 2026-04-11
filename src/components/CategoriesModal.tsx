@@ -209,3 +209,4 @@ export default function CategoriesModal({ open, onOpenChange, trigger }: Categor
     </Dialog>
   );
 }
+

@@ -36,3 +36,4 @@ export const safeSetDoc = async (docRef: DocumentReference, data: any, options?:
      throw error;
   }
 };
+

@@ -38,3 +38,4 @@ if (isInitialized && adminDb) {
 }
 export const adminAuth = isInitialized ? getAuth() : null as any;
 
+

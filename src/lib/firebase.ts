@@ -9,3 +9,4 @@ export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true
 }, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
+

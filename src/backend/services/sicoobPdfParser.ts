@@ -73,3 +73,4 @@ export async function parseSicoobPdf(buffer: Buffer): Promise<ParsedTransaction[
 
   return transactions;
 }
+

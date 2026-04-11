@@ -70,3 +70,4 @@ O projeto utiliza **Firebase Security Rules** rigorosas para garantir isolamento
 
 ---
 *Developed with focus on performance and data integrity.*
+

@@ -267,3 +267,4 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
     </div>
   );
 }
+
