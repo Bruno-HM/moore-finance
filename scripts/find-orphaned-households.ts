@@ -1,25 +1,38 @@
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
-const serviceAccount = JSON.parse(
-  readFileSync(path.join(__dirname, '../serviceAccountKey.json'), 'utf8')
-);
-const firebaseConfig = JSON.parse(
-  readFileSync(path.join(__dirname, '../firebase-applet-config.json'), 'utf8')
-);
+let serviceAccount: any;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  const serviceAccountPath = path.join(__dirname, '../serviceAccountKey.json');
+  if (existsSync(serviceAccountPath)) {
+    serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+  }
+}
+
+if (!serviceAccount) {
+  console.error('❌ Erro: Nenhuma credencial do Firebase encontrada (FIREBASE_SERVICE_ACCOUNT ou serviceAccountKey.json)');
+  process.exit(1);
+}
 
 const app = admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const dbId = process.env.FIREBASE_DATABASE_ID || '(default)';
+const db = getFirestore(app, dbId);
 
 async function findOrphanedHouseholds() {
   console.log('🔍 Iniciando busca por households órfãos...');

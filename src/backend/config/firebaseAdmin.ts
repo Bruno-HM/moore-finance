@@ -32,7 +32,8 @@ try {
   console.error("❌ Firebase Admin SDK initialization failed:", error);
 }
 
-export const adminDb = isInitialized ? getFirestore() : null as any;
+const dbId = process.env.FIREBASE_DATABASE_ID || '(default)';
+export const adminDb = isInitialized ? getFirestore(undefined, dbId) : null as any;
 if (isInitialized && adminDb) {
   adminDb.settings({ ignoreUndefinedProperties: true });
 }

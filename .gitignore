@@ -8,4 +8,6 @@ coverage/
 !.env.example
 serviceAccountKey.json
 *.txt
+firebase-applet-config.json
+firebase-blueprint.json
 
