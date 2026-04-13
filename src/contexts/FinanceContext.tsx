@@ -225,7 +225,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     );
 
     const unsubscribeTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const transData = snapshot.docs.map(doc => doc.data() as Transaction);
+      const transData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
       setTransactions(transData);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'transactions');
@@ -237,7 +237,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       where('householdId', '==', householdId)
     );
     const unsubscribeCreditCards = onSnapshot(qCreditCards, (snapshot) => {
-      const ccData = snapshot.docs.map(doc => doc.data() as CreditCard);
+      const ccData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CreditCard));
       setCreditCards(ccData);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'credit_cards');
@@ -250,7 +250,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     );
 
     const unsubscribeRecurring = onSnapshot(qRecurring, (snapshot) => {
-      const recurringData = snapshot.docs.map(doc => doc.data() as RecurringTransaction);
+      const recurringData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RecurringTransaction));
       setRecurringTransactions(recurringData);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'recurring_transactions');
@@ -281,7 +281,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } else {
-        const catData = snapshot.docs.map(doc => doc.data() as Category);
+        const catData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
         setCategories(catData);
       }
       setLoading(false);
@@ -296,7 +296,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       where('householdId', '==', householdId)
     );
     const unsubscribeBankAccounts = onSnapshot(qBankAccounts, (snapshot) => {
-      const baData = snapshot.docs.map(doc => doc.data() as BankAccount);
+      const baData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
       setBankAccounts(baData);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'bank_accounts');

@@ -176,9 +176,9 @@ export default function TransactionModal({
   }, [bankAccounts, bankAccountId]);
 
   const paymentMethodLabels: Record<string, string> = {
-    pix: 'P-I-X',
-    credito: 'C. de Crédito',
-    debito: 'C. de Débito',
+    pix: 'PIX',
+    credito: 'Cartão de Crédito',
+    debito: 'Cartão de Débito',
     dinheiro: 'Dinheiro'
   };
 
@@ -190,10 +190,10 @@ export default function TransactionModal({
           <Select value={recurrenceType} onValueChange={(v: any) => setRecurrenceType(v)}>
             <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
               <SelectValue placeholder="Recorrência">
-                {recurrenceType === 'unica' ? 'Único' : 
-                 recurrenceType === 'parcelada' ? 'Parcelado' :
-                 recurrenceType === 'fixa' ? 'Fixo (Mensal)' :
-                 recurrenceType === 'assinatura' ? 'Assinatura' : undefined}
+                {recurrenceType === 'unica' ? 'Único' :
+                  recurrenceType === 'parcelada' ? 'Parcelado' :
+                    recurrenceType === 'fixa' ? 'Fixo (Mensal)' :
+                      recurrenceType === 'assinatura' ? 'Assinatura' : undefined}
               </SelectValue>
             </SelectTrigger>
             <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
@@ -253,8 +253,8 @@ export default function TransactionModal({
         <DialogHeader className="p-8 pb-4 border-b border-white/5">
           <DialogTitle className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
             {mode === 'recurring' && <RefreshCw className="w-6 h-6 text-primary" />}
-            {editingTransaction 
-              ? (mode === 'recurring' ? 'Editar Assinatura/Fixo' : 'Editar Registro') 
+            {editingTransaction
+              ? (mode === 'recurring' ? 'Editar Assinatura/Fixo' : 'Editar Registro')
               : (mode === 'recurring' ? 'Nova Assinatura ou Fixo' : 'Novo Lançamento')}
           </DialogTitle>
         </DialogHeader>
@@ -324,7 +324,7 @@ export default function TransactionModal({
                   <Select value={categoryId} onValueChange={setCategoryId}>
                     <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
                       <SelectValue placeholder="Categoria">
-                        {categories.find(c => c.id === categoryId)?.name}
+                        {selectedCategoryName}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
@@ -352,10 +352,7 @@ export default function TransactionModal({
                   <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
                     <SelectTrigger className="h-14 px-6 rounded-2xl bg-white/5 border-none font-bold text-base text-white">
                       <SelectValue placeholder="Selecione a forma">
-                        {paymentMethod === 'pix' ? 'PIX' : 
-                         paymentMethod === 'credito' ? 'Cartão de Crédito' :
-                         paymentMethod === 'debito' ? 'Cartão de Débito' :
-                         paymentMethod === 'dinheiro' ? 'Dinheiro' : undefined}
+                        {paymentMethodLabels[paymentMethod]}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-black/90 backdrop-blur-2xl border-white/10 rounded-xl">
@@ -423,20 +420,19 @@ export default function TransactionModal({
             <Button
               type="submit"
               disabled={loading}
-              className={`flex-1 h-14 rounded-2xl font-black text-lg shadow-xl transition-all ${
-                mode === 'recurring' 
-                  ? 'bg-white text-black hover:bg-white/90 shadow-white/10' 
+              className={`flex-1 h-14 rounded-2xl font-black text-lg shadow-xl transition-all ${mode === 'recurring'
+                  ? 'bg-white text-black hover:bg-white/90 shadow-white/10'
                   : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20'
-              }`}
+                }`}
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Salvando...
                 </>
-               ) : (
-                editingTransaction 
-                  ? (mode === 'recurring' ? 'Salvar Alterações' : 'Salvar Alterações') 
+              ) : (
+                editingTransaction
+                  ? (mode === 'recurring' ? 'Salvar Alterações' : 'Salvar Alterações')
                   : (mode === 'recurring' ? 'Ativar Automação' : 'Confirmar Lançamento')
               )}
             </Button>
